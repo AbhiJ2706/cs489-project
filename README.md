@@ -19,3 +19,8 @@ pip install cs489-project
 ## License
 
 `cs489-project` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
+
+## Usages 
+python src/cs489_project/wav_to_sheet_music.py input.wav output.musicxml
+
+python src/cs489_project/wav_to_sheet_music.py input.wav output.musicxml --pdf output.pdf
