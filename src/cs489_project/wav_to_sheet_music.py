@@ -139,7 +139,7 @@ def detect_notes_and_chords(audio_data, sample_rate):
         
         # Add end time
         onset_times = np.append(onset_times, librosa.frames_to_time(
-            [len(audio_data) // hop_length], 
+            [200], 
             sr=sample_rate, 
             hop_length=hop_length
         ))
