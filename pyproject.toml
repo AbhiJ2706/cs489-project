@@ -32,7 +32,8 @@ dependencies = [
     "matplotlib",
     "pretty_midi",
     "noisereduce",
-    "pedalboard"
+    "pedalboard",
+    "music21"
 ]
 
 [project.urls]
