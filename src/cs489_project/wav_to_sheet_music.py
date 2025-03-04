@@ -398,9 +398,11 @@ def midi_to_musicxml(midi_data, title="Transcribed Music"):
     if midi_data.instruments and midi_data.instruments[0].notes:
         # Sort notes by start time
         all_notes = sorted(midi_data.instruments[0].notes, key=lambda x: x.start)
+
+        measure_count = 1
         
         # Create a measure
-        current_measure = stream.Measure(number=1)
+        current_measure = stream.Measure(number=measure_count)
         
         # Process each note (focus on melody - take the highest note at each time point)
         current_time = 0
@@ -432,25 +434,39 @@ def midi_to_musicxml(midi_data, title="Transcribed Music"):
                 # Set duration
                 if note_duration <= 0.25:
                     m21_note.duration = duration.Duration(type='16th')
+                    current_time += 0.25
                 elif note_duration <= 0.5:
                     m21_note.duration = duration.Duration(type='eighth')
+                    current_time += 0.5
                 elif note_duration <= 1.0:
                     m21_note.duration = duration.Duration(type='quarter')
+                    current_time += 1.0
                 elif note_duration <= 2.0:
                     m21_note.duration = duration.Duration(type='half')
+                    current_time += 2.0
                 else:
                     m21_note.duration = duration.Duration(type='whole')
+                    current_time += 4.0
                 
                 # Add the note to the current measure
                 current_measure.append(m21_note)
+
+                if current_measure.duration.quarterLength >= 4.0:
+                    melody_part.append(current_measure)
+                    measure_count += 1
+                    current_measure = stream.Measure(number=measure_count)
+
     else:
         # If no notes were detected, add a placeholder rest
         placeholder = note.Rest()
         placeholder.duration = duration.Duration(type='whole')
         current_measure.append(placeholder)
+        melody_part.append(current_measure)
+        measure_count += 1
+        current_measure = stream.Measure(number=measure_count)
+        current_time += 4.0
     
     # Add the measure to the melody part
-    melody_part.append(current_measure)
     
     # Add the melody part to the score
     score.append(melody_part)
