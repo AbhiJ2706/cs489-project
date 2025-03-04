@@ -1,0 +1,11 @@
+fastapi>=0.104.1
+uvicorn>=0.24.0
+python-multipart>=0.0.6
+librosa>=0.10.1
+pretty_midi>=0.2.10
+noisereduce>=2.0.1
+pedalboard>=0.8.6
+matplotlib>=3.8.0
+scipy>=1.11.3
+music21>=9.1.0
+pydantic>=2.4.2 
