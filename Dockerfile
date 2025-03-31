@@ -20,21 +20,23 @@ RUN apt-get update && apt-get install -y \
     libavformat-dev \
     libavutil-dev \
     libswresample-dev \
+    # Dependencies for MuseScore
+    xvfb \
+    libopengl0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Download and install MuseScore
-RUN apt-get update && apt-get install -y \
-    libfreetype6 \
-    libfontconfig1 \
-    libx11-6 \
-    libxext6 \
-    libxcb1 \
-    libgl1 \
-    libasound2 \
-    && wget -q https://cdn.jsdelivr.net/musescore/v4.5.1/MuseScore-Studio-4.5.1.250800846-x86_64.AppImage -O /usr/local/bin/musescore \
-    && chmod +x /usr/local/bin/musescore \
-    && ln -s /usr/local/bin/musescore /usr/local/bin/mscore \
-    && rm -rf /var/lib/apt/lists/*
+# Install MuseScore using AppImage extraction
+RUN wget -q -O musescore.appimage https://cdn.jsdelivr.net/musescore/v4.4.1/MuseScore-Studio-4.4.1.242490810-x86_64.AppImage && \
+    chmod +x musescore.appimage && \
+    ./musescore.appimage --appimage-extract && \
+    rm musescore.appimage && \
+    # Create a wrapper script for MuseScore
+    echo '#!/bin/bash\n\
+timeout 60 xvfb-run -s "-screen 0 640x480x24 -ac +extension GLX +render -noreset" \
+squashfs-root/bin/mscore4portable "$@"' > /usr/local/bin/mscore && \
+    chmod +x /usr/local/bin/mscore && \
+    # Test that it works
+    mscore --version
 
 # Install Bun
 RUN curl -fsSL https://bun.sh/install | bash 
