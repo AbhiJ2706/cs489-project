@@ -17,7 +17,6 @@ interface ResultsPanelProps {
 interface AvailableFiles {
   musicxml: boolean;
   pdf: boolean;
-  original_audio?: string;
 }
 
 export function ResultsPanel({ fileId, onReset }: ResultsPanelProps) {
@@ -35,7 +34,7 @@ export function ResultsPanel({ fileId, onReset }: ResultsPanelProps) {
     const fetchFileStatus = async () => {
       try {
         setIsLoading(true);
-        const response = await apiFetch(`files/${fileId}/status`);
+        const response = await apiFetch(`check-files/${fileId}`);
         
         if (!response.ok) {
           throw new Error("Failed to fetch file status");
@@ -43,14 +42,12 @@ export function ResultsPanel({ fileId, onReset }: ResultsPanelProps) {
         
         const data = await response.json();
         setAvailableFiles({
-          musicxml: data.has_musicxml || false,
-          pdf: data.has_pdf || false,
-          original_audio: data.original_audio || null
+          musicxml: data.musicxml || false,
+          pdf: data.pdf || false
         });
         
-        // If original audio is available, set its URL
-        if (data.original_audio) {
-          setOriginalAudioUrl(apiUrl(data.original_audio));
+        if (fileId) {
+          setOriginalAudioUrl(apiUrl(`uploads/${fileId}.wav`));
         }
         
         setIsLoading(false);
@@ -62,37 +59,21 @@ export function ResultsPanel({ fileId, onReset }: ResultsPanelProps) {
     };
 
     fetchFileStatus();
-    const intervalId = setInterval(fetchFileStatus, 5000);
     
-    return () => clearInterval(intervalId);
   }, [fileId]);
 
   const handleDownload = async (fileType: "musicxml" | "pdf") => {
     if (!fileId) return;
     
-    try {
-      const response = await apiFetch(`files/${fileId}/download?type=${fileType}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to download ${fileType.toUpperCase()} file`);
-      }
-      
-      const data = await response.json();
-      const downloadUrl = data.download_url;
-      
-      if (downloadUrl) {
-        // Create a link and click it to download
-        const link = document.createElement("a");
-        link.href = apiUrl(downloadUrl);
-        link.download = `sheet_music.${fileType}`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-    } catch (error) {
-      console.error(`Error downloading ${fileType} file:`, error);
-      toast.error(`Failed to download ${fileType.toUpperCase()} file`);
-    }
+    const url = apiUrl(`download/${fileType}/${fileId}`);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `sheet_music.${fileType}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success(`${fileType.toUpperCase()} file downloaded successfully!`);
   };
 
   if (!fileId) {

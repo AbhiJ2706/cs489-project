@@ -133,9 +133,12 @@ export function AudioPlayer({ file, fileId, originalAudio = false }: AudioPlayer
   // Handle fileId-based playback (synthesized audio from MusicXML)
   useEffect(() => {
     if (fileId) {
-      fetchSynthesizedAudio(fileId);
+      // Don't try to fetch original audio - that's handled by ResultsPanel now
+      if (!originalAudio) {
+        fetchSynthesizedAudio(fileId);
+      }
     }
-  }, [fileId, fetchSynthesizedAudio]);  // Add fetchSynthesizedAudio as dependency
+  }, [fileId, fetchSynthesizedAudio, originalAudio]);  // Add originalAudio as dependency
 
   const togglePlayPause = () => {
     if (!audioRef.current) return;
