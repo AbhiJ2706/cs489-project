@@ -6,7 +6,6 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { FileDown, FileText, AlertCircle, RefreshCw, FileWarning, ExternalLink, Music } from "lucide-react";
-import Link from "next/link";
 import { AudioPlayer } from "./audioPlayer";
 import { apiFetch, apiUrl } from "../lib/apiUtils";
 
@@ -18,50 +17,82 @@ interface ResultsPanelProps {
 interface AvailableFiles {
   musicxml: boolean;
   pdf: boolean;
+  original_audio?: string;
 }
 
 export function ResultsPanel({ fileId, onReset }: ResultsPanelProps) {
+  const [availableFiles, setAvailableFiles] = useState<AvailableFiles>({
+    musicxml: false,
+    pdf: false
+  });
   const [isLoading, setIsLoading] = useState(true);
+  const [originalAudioUrl, setOriginalAudioUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [availableFiles, setAvailableFiles] = useState<AvailableFiles>({ musicxml: false, pdf: false });
 
   useEffect(() => {
-    // Reset state when fileId changes
-    if (fileId) {
-      setIsLoading(true);
-      setError(null);
-      
-      // Check which files are available
-      apiFetch(`check-files/${fileId}`)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error("Failed to check available files");
-          }
-          return response.json();
-        })
-        .then((data: AvailableFiles) => {
-          setAvailableFiles(data);
-          setIsLoading(false);
-        })
-        .catch(() => {
-          setError("Failed to load the converted files. Please try again.");
-          setIsLoading(false);
+    if (!fileId) return;
+
+    const fetchFileStatus = async () => {
+      try {
+        setIsLoading(true);
+        const response = await apiFetch(`files/${fileId}/status`);
+        
+        if (!response.ok) {
+          throw new Error("Failed to fetch file status");
+        }
+        
+        const data = await response.json();
+        setAvailableFiles({
+          musicxml: data.has_musicxml || false,
+          pdf: data.has_pdf || false,
+          original_audio: data.original_audio || null
         });
-    }
+        
+        // If original audio is available, set its URL
+        if (data.original_audio) {
+          setOriginalAudioUrl(apiUrl(data.original_audio));
+        }
+        
+        setIsLoading(false);
+      } catch (error) {
+        console.error("Error fetching file status:", error);
+        setError("Failed to fetch file status");
+        setIsLoading(false);
+      }
+    };
+
+    fetchFileStatus();
+    const intervalId = setInterval(fetchFileStatus, 5000);
+    
+    return () => clearInterval(intervalId);
   }, [fileId]);
 
-  const handleDownload = (fileType: "musicxml" | "pdf") => {
-    if (!fileId || !availableFiles[fileType]) return;
+  const handleDownload = async (fileType: "musicxml" | "pdf") => {
+    if (!fileId) return;
     
-    const url = apiUrl(`download/${fileType}/${fileId}`);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `sheet_music.${fileType}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast.success(`${fileType.toUpperCase()} file downloaded successfully!`);
+    try {
+      const response = await apiFetch(`files/${fileId}/download?type=${fileType}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to download ${fileType.toUpperCase()} file`);
+      }
+      
+      const data = await response.json();
+      const downloadUrl = data.download_url;
+      
+      if (downloadUrl) {
+        // Create a link and click it to download
+        const link = document.createElement("a");
+        link.href = apiUrl(downloadUrl);
+        link.download = `sheet_music.${fileType}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error) {
+      console.error(`Error downloading ${fileType} file:`, error);
+      toast.error(`Failed to download ${fileType.toUpperCase()} file`);
+    }
   };
 
   if (!fileId) {
@@ -141,31 +172,67 @@ export function ResultsPanel({ fileId, onReset }: ResultsPanelProps) {
 
               {availableFiles.musicxml && (
                 <div className="pt-2">
-                  <Link href={`/musicxml-viewer/${fileId}`} target="_blank" passHref>
-                    <Button variant="outline" className="w-full">
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      View Sheet Music in Browser
-                    </Button>
-                  </Link>
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    className="w-full"
+                  >
+                    <a 
+                      href={`/view?id=${fileId}&type=musicxml`}
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Open Sheet Music Viewer
+                    </a>
+                  </Button>
                   <p className="text-xs text-muted-foreground mt-2 text-center">
                     Opens in a new tab with interactive sheet music viewer
                   </p>
                 </div>
               )}
               
-              {/* Synthesized Audio Player */}
-              {availableFiles.musicxml && (
-                <div className="pt-4 border-t border-muted mt-4">
-                  <h3 className="text-sm font-medium flex items-center gap-2 mb-3">
-                    <Music className="h-4 w-4" />
-                    Listen to Synthesized Audio
-                  </h3>
-                  <AudioPlayer fileId={fileId} />
-                  <p className="text-xs text-muted-foreground mt-2 text-center">
-                    Audio synthesized from the sheet music
-                  </p>
+              {/* Audio Players - Side by Side */}
+              <div className="pt-4 border-t border-muted mt-4">
+                <h3 className="text-sm font-medium flex items-center gap-2 mb-3">
+                  <Music className="h-4 w-4" />
+                  Compare Original vs Synthesized Audio
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Original Audio Player */}
+                  <div className="flex flex-col">
+                    <div className="text-center font-medium mb-2">
+                      Original Audio
+                    </div>
+                    {originalAudioUrl ? (
+                      <audio 
+                        controls 
+                        src={originalAudioUrl} 
+                        className="w-full"
+                      ></audio>
+                    ) : (
+                      <AudioPlayer fileId={fileId} originalAudio={true} />
+                    )}
+                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                      Original uploaded audio file
+                    </p>
+                  </div>
+                  
+                  {/* Synthesized Audio Player */}
+                  {availableFiles.musicxml && (
+                    <div className="flex flex-col">
+                      <div className="text-center font-medium mb-2">
+                        Synthesized Audio
+                      </div>
+                      <AudioPlayer fileId={fileId} />
+                      <p className="text-xs text-muted-foreground mt-2 text-center">
+                        Audio synthesized from the sheet music
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           )}
         </div>
@@ -181,4 +248,4 @@ export function ResultsPanel({ fileId, onReset }: ResultsPanelProps) {
       </CardFooter>
     </Card>
   );
-} 
+}

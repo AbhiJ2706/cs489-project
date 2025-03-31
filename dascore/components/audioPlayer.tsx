@@ -11,9 +11,10 @@ import { apiFetch, apiUrl } from "@/lib/apiUtils";
 interface AudioPlayerProps {
   file?: File | null;
   fileId?: string | null;
+  originalAudio?: boolean;
 }
 
-export function AudioPlayer({ file, fileId }: AudioPlayerProps) {
+export function AudioPlayer({ file, fileId, originalAudio = false }: AudioPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -103,7 +104,7 @@ export function AudioPlayer({ file, fileId }: AudioPlayerProps) {
       setError(null);
       
       // First, request the server to synthesize audio from MusicXML
-      const response = await apiFetch(`synthesize/${id}`);
+      const response = await apiFetch(originalAudio ? `files/${id}/original_audio` : `synthesize/${id}`);
       
       if (!response.ok) {
         const errorData = await response.json();
@@ -127,7 +128,7 @@ export function AudioPlayer({ file, fileId }: AudioPlayerProps) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       setIsLoading(false);
     }
-  }, []);  // No dependencies as it uses only state setters which are stable
+  }, [originalAudio]);  // Add originalAudio as dependency
 
   // Handle fileId-based playback (synthesized audio from MusicXML)
   useEffect(() => {
