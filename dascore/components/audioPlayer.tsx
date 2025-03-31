@@ -116,6 +116,9 @@ export function AudioPlayer({ file, fileId }: AudioPlayerProps) {
       const audioUrlPath = data.audio_url.startsWith('/') ? data.audio_url.substring(1) : data.audio_url;
       const audioPath = apiUrl(audioUrlPath);
       
+      // Set the audio URL state variable
+      setAudioUrl(audioPath);
+      
       // Create new audio element with the URL
       setupAudioElement(audioPath);
       
