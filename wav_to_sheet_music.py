@@ -28,9 +28,11 @@ from scipy.signal import butter, filtfilt
 import xml.etree.ElementTree as ET
 import scipy
 import warnings
+import soundfile as sf
+import time
 
 # Suppress specific warnings
-warnings.filterwarnings("ignore", message="PySoundFile failed. Trying audioread instead.")
+warnings.filterwarnings("ignore", message="PySoundFile failed.*")
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 def preprocess_audio(audio_data, sample_rate):
@@ -395,6 +397,7 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
     Args:
         midi_data (pretty_midi.PrettyMIDI): The MIDI data to convert
         title (str): The title of the sheet music
+        tp (float or int): Tempo in beats per minute
         
     Returns:
         music21.stream.Score: A music21 score object
@@ -413,8 +416,20 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
     # Add clef, time signature and tempo
     melody_part.append(clef.TrebleClef())
     melody_part.append(meter.TimeSignature('4/4'))
-    melody_part.append(tempo.MetronomeMark(number=tp))
-
+    
+    # Handle the tempo value - ensure it's a single number
+    if isinstance(tp, (list, tuple, np.ndarray)):
+        tempo_value = tp[0]  # Get first element if it's a sequence
+    else:
+        tempo_value = tp  # Use as is if it's a scalar
+        
+    # Ensure we have a sensible tempo value
+    if tempo_value < 20 or tempo_value > 300:
+        print(f"Warning: Unusual tempo value ({tempo_value}), using default of 120 BPM")
+        tempo_value = 120
+        
+    melody_part.append(tempo.MetronomeMark(number=float(tempo_value)))
+    
     note_list = []
     
     # Get the notes from the first instrument
@@ -615,6 +630,9 @@ def load_audio_with_fallback(input_wav):
     if file_size == 0:
         raise ValueError(f"Audio file is empty: {input_wav}")
     
+    # Print file information
+    print(f"File size: {file_size} bytes")
+    
     # Try different methods to load the audio file
     methods = [
         # Method 1: Use librosa with default settings
@@ -629,7 +647,10 @@ def load_audio_with_fallback(input_wav):
         # Method 4: Use ffmpeg to convert to standard format first
         lambda: _convert_and_load_with_ffmpeg(input_wav),
         
-        # Method 5: Generate dummy audio as last resort (for testing only)
+        # Method 5: Use soundfile directly with no parameters
+        lambda: (lambda x: (x[0], x[1]))(sf.read(input_wav)),
+        
+        # Method 6: Generate dummy audio as last resort (for testing only)
         lambda: (np.sin(np.linspace(0, 440 * 2 * np.pi, 22050 * 10)), 22050)
     ]
     
@@ -670,28 +691,131 @@ def _convert_and_load_with_ffmpeg(input_wav):
         tuple: (audio_data, sample_rate)
     """
     temp_dir = tempfile.gettempdir()
-    output_wav = os.path.join(temp_dir, "converted_audio.wav")
+    output_wav = os.path.join(temp_dir, f"converted_audio_{os.getpid()}_{int(time.time())}.wav")
     
     try:
-        # Convert to standard WAV format
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", input_wav, "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "1", output_wav],
-            check=True,
+        # Print information about the input file for debugging
+        print(f"Attempting to convert {input_wav} with ffmpeg")
+        
+        # First try to get file info 
+        file_info = None
+        format_hint = None
+        
+        try:
+            # Try to read the first few bytes to determine file type
+            with open(input_wav, 'rb') as f:
+                header = f.read(12)
+                
+            # Try to identify format based on header
+            if header.startswith(b'RIFF'):
+                format_hint = "wav"
+                print("Detected RIFF/WAV format")
+            elif header.startswith(b'ID3') or header.startswith(b'\xff\xfb'):
+                format_hint = "mp3"
+                print("Detected MP3 format")
+            elif header.startswith(b'\x00\x00\x00\x20ftypM4A'):
+                format_hint = "m4a"
+                print("Detected M4A format")
+            elif header.startswith(b'fLaC'):
+                format_hint = "flac"
+                print("Detected FLAC format")
+            elif header.startswith(b'OggS'):
+                format_hint = "ogg"
+                print("Detected OGG format")
+            elif header.startswith(b'caff') or header.startswith(b'vers'):
+                format_hint = "caf"
+                print("Detected Apple Core Audio Format (CAF)")
+            else:
+                print(f"Unknown file format, header bytes: {header!r}")
+        except Exception as e:
+            print(f"Error reading file header: {e}")
+        
+        # Build conversion command with options for Linux compatibility
+        convert_cmd = [
+            "ffmpeg", "-y",          # Force overwrite
+            "-vn",                   # No video
+        ]
+        
+        # Add format hint if detected
+        if format_hint:
+            convert_cmd.extend(["-f", format_hint])
+            
+        convert_cmd.extend([
+            "-i", input_wav,         # Input file
+            "-f", "wav",             # Force WAV output format
+            "-acodec", "pcm_s16le",  # 16-bit PCM codec (most compatible)
+            "-ar", "44100",          # 44.1kHz sample rate
+            "-ac", "1",              # Mono (1 channel)
+            "-loglevel", "warning",  # Reduce log noise
+            output_wav               # Output file
+        ])
+        
+        print(f"Running FFmpeg command: {' '.join(convert_cmd)}")
+        
+        # Run the conversion command with detailed error output
+        process = subprocess.run(
+            convert_cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
+            check=False  # Don't raise error so we can handle it
         )
         
-        # Load the converted file
-        audio_data, sample_rate = librosa.load(output_wav, sr=None, mono=True)
+        # If the conversion failed, try again with different options
+        if process.returncode != 0:
+            stderr = process.stderr.decode('utf-8', errors='replace')
+            print(f"FFmpeg conversion failed with code {process.returncode}")
+            print(f"FFmpeg stderr: {stderr[:500]}...")
+            
+            # Try with explicit format detection disabled
+            print("Trying alternative FFmpeg options...")
+            alt_cmd = [
+                "ffmpeg", "-y",
+                "-vn",
+                "-i", input_wav,
+                "-f", "wav",
+                "-acodec", "pcm_s16le",
+                "-ar", "44100",
+                "-ac", "1",
+                output_wav
+            ]
+            
+            process = subprocess.run(
+                alt_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True  # Now we want it to raise an error if it fails
+            )
+        
+        # Check if file was created successfully
+        if not os.path.exists(output_wav) or os.path.getsize(output_wav) == 0:
+            raise RuntimeError(f"FFmpeg created empty or no output file: {output_wav}")
+            
+        # Load the converted file - try with safer options for Linux
+        try:
+            audio_data, sample_rate = librosa.load(output_wav, sr=44100, mono=True, res_type='kaiser_fast')
+        except Exception as load_error:
+            print(f"Error loading converted file with librosa: {load_error}")
+            # Fall back to scipy
+            sr, data = scipy.io.wavfile.read(output_wav)
+            audio_data = data.astype(float) / np.max(np.abs(data))
+            sample_rate = sr
+            
         return audio_data, sample_rate
+    
+    except Exception as e:
+        print(f"FFmpeg conversion failed: {e}")
+        error_details = traceback.format_exc()
+        print(f"Error details:\n{error_details}")
+        raise
     
     finally:
         # Clean up
         if os.path.exists(output_wav):
             try:
                 os.remove(output_wav)
-            except:
-                pass
+            except Exception as rm_error:
+                print(f"Warning: Could not remove temporary file {output_wav}: {rm_error}")
+
 
 def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, output_pdf=None):
     """
@@ -721,9 +845,8 @@ def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, outpu
         
         # Detect tempo
         print("Detecting tempo...")
-        tempo, _ = librosa.beat.beat_track(y=audio_data, sr=sample_rate)
-
-        print(tempo)
+        tempo_value, _ = librosa.beat.beat_track(y=audio_data, sr=sample_rate)
+        print(f"Detected tempo: {tempo_value} BPM")
         
         # Set a default title if none provided
         if title is None:
@@ -737,9 +860,9 @@ def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, outpu
         print("Detecting notes...")
         midi_data = detect_notes_and_chords(preprocessed_audio, sample_rate)
         
-        # Convert to MusicXML
+        # Convert to MusicXML - pass tempo as a scalar, not a sequence
         print("Converting to MusicXML...")
-        score, note_list = midi_to_musicxml(midi_data, title=title, tp=tempo[0])
+        score, note_list = midi_to_musicxml(midi_data, title=title, tp=tempo_value)
         
         # Generate sheet music
         print("Generating sheet music...")
