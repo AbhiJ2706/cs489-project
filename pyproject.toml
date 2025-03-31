@@ -42,7 +42,7 @@ Issues = "https://github.com/unknown/cs489-project/issues"
 Source = "https://github.com/unknown/cs489-project"
 
 [tool.hatch.version]
-path = "src/cs489_project/__about__.py"
+path = "__about__.py"
 
 [tool.hatch.envs.default]
 dependencies = [
@@ -76,7 +76,7 @@ source_pkgs = ["cs489_project", "tests"]
 branch = true
 parallel = true
 omit = [
-  "src/cs489_project/__about__.py",
+  "__about__.py",
 ]
 
 [tool.coverage.paths]
