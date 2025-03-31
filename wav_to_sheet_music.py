@@ -25,6 +25,8 @@ from scipy.signal import find_peaks
 from music21 import stream, note, meter, tempo, metadata, duration, converter, chord, clef, instrument
 from scipy.signal import butter, filtfilt
 import xml.etree.ElementTree as ET
+import traceback
+import scipy
 
 def preprocess_audio(audio_data, sample_rate):
     """
@@ -589,6 +591,131 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, note_
         return False
 
 
+def load_audio_with_fallback(input_wav):
+    """
+    Load audio file with multiple fallback methods.
+    
+    Args:
+        input_wav (str): Path to the input WAV file
+        
+    Returns:
+        tuple: (audio_data, sample_rate)
+    """
+    # Try different methods to load the audio file
+    methods = [
+        # Method 1: Use librosa with default settings
+        lambda: librosa.load(input_wav, sr=None, mono=True),
+        
+        # Method 2: Use librosa with explicit audioread backend
+        lambda: librosa.load(input_wav, sr=None, mono=True, res_type='kaiser_fast'),
+        
+        # Method 3: Use scipy.io.wavfile directly
+        lambda: (lambda sr, data: (data.astype(float) / np.max(np.abs(data)), sr))(*scipy.io.wavfile.read(input_wav)),
+        
+        # Method 4: Use ffmpeg directly if available
+        lambda: (lambda: (subprocess.check_output(["ffmpeg", "-i", input_wav, "-f", "wav", "-"], stderr=subprocess.PIPE), 44100))()
+    ]
+    
+    last_error = None
+    for i, method in enumerate(methods):
+        try:
+            print(f"Trying audio loading method {i+1}...")
+            audio_data, sample_rate = method()
+            print(f"Successfully loaded audio with method {i+1}")
+            
+            # Ensure audio is mono
+            if len(audio_data.shape) > 1 and audio_data.shape[1] > 1:
+                audio_data = np.mean(audio_data, axis=1)
+            
+            # Normalize audio if needed
+            if np.max(np.abs(audio_data)) > 1.0:
+                audio_data = audio_data / np.max(np.abs(audio_data))
+                
+            return audio_data, sample_rate
+        except Exception as e:
+            last_error = e
+            error_details = traceback.format_exc()
+            print(f"Method {i+1} failed: {e}")
+            print(f"Error details:\n{error_details}")
+    
+    # If all methods fail, raise the last error
+    raise RuntimeError(f"Failed to load audio file with all methods. Last error: {last_error}")
+
+
+def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, output_pdf=None):
+    """
+    Convert a WAV audio file to sheet music in MusicXML format.
+    
+    Args:
+        input_wav (str): Path to the input WAV file
+        output_xml (str): Path to save the output MusicXML file
+        title (str, optional): Title for the sheet music
+        visualize (bool, optional): Whether to visualize the audio
+        output_pdf (str, optional): Path to save the output PDF file
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        # Load the audio file
+        print(f"Loading audio file: {input_wav}")
+        try:
+            audio_data, sample_rate = load_audio_with_fallback(input_wav)
+        except Exception as e:
+            print(f"Error loading audio: {e}")
+            error_details = traceback.format_exc()
+            print(f"Error details:\n{error_details}")
+            return False
+            
+        print(f"Sample rate: {sample_rate}")
+        
+        # Detect tempo
+        print("Detecting tempo...")
+        tempo, _ = librosa.beat.beat_track(y=audio_data, sr=sample_rate)
+
+        print(tempo)
+        
+        # Set a default title if none provided
+        if title is None:
+            title = os.path.splitext(os.path.basename(input_wav))[0]
+        
+        # Preprocess the audio
+        print("Preprocessing audio...")
+        preprocessed_audio = preprocess_audio(audio_data, sample_rate)
+        
+        # Detect notes
+        print("Detecting notes...")
+        midi_data = detect_notes_and_chords(preprocessed_audio, sample_rate)
+        
+        # Convert to MusicXML
+        print("Converting to MusicXML...")
+        score, note_list = midi_to_musicxml(midi_data, title=title, tp=tempo[0])
+        
+        # Generate sheet music
+        print("Generating sheet music...")
+        success = generate_sheet_music(score, output_xml, output_pdf, note_list)
+        
+        # Visualize audio if requested
+        if visualize:
+            print("Generating audio visualization...")
+            output_image = os.path.splitext(output_xml)[0] + "_visualization.png"
+            visualize_audio(preprocessed_audio, sample_rate, output_image)
+        
+        if success:
+            print("Conversion completed successfully.")
+        else:
+            print("Conversion completed with errors.")
+        
+        return success
+    
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error converting WAV to sheet music: {e}")
+        print(f"Error details:\n{error_details}")
+        return False
+
+
 def visualize_audio(audio_data, sample_rate, output_image=None):
     """
     Visualize the audio waveform and spectrogram.
@@ -645,73 +772,6 @@ def visualize_audio(audio_data, sample_rate, output_image=None):
     else:
         plt.tight_layout()
         plt.show()
-
-
-def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, output_pdf=None):
-    """
-    Convert a WAV file to sheet music.
-    
-    Args:
-        input_wav (str): Path to the input WAV file
-        output_xml (str): Path to save the output MusicXML file
-        title (str, optional): Title for the sheet music
-        visualize (bool, optional): Whether to visualize the audio
-        output_pdf (str, optional): Path to save the output PDF file
-        
-    Returns:
-        bool: True if successful, False otherwise
-    """
-    try:
-        # Load the audio file
-        print(f"Loading audio file: {input_wav}")
-        audio_data, sample_rate = librosa.load(input_wav, sr=None, mono=True)
-        print(f"Sample rate: {sample_rate}")
-        
-        # Detect tempo
-        print("Detecting tempo...")
-        tempo, _ = librosa.beat.beat_track(y=audio_data, sr=sample_rate)
-
-        print(tempo)
-        
-        # Set a default title if none provided
-        if title is None:
-            title = os.path.splitext(os.path.basename(input_wav))[0]
-        
-        # Preprocess the audio
-        print("Preprocessing audio...")
-        preprocessed_audio = preprocess_audio(audio_data, sample_rate)
-        
-        # Detect notes
-        print("Detecting notes...")
-        midi_data = detect_notes_and_chords(preprocessed_audio, sample_rate)
-        
-        # Convert to MusicXML
-        print("Converting to MusicXML...")
-        score, note_list = midi_to_musicxml(midi_data, title=title, tp=tempo[0])
-        
-        # Generate sheet music
-        print("Generating sheet music...")
-        success = generate_sheet_music(score, output_xml, output_pdf, note_list)
-        
-        # Visualize audio if requested
-        if visualize:
-            print("Generating audio visualization...")
-            output_image = os.path.splitext(output_xml)[0] + "_visualization.png"
-            visualize_audio(preprocessed_audio, sample_rate, output_image)
-        
-        if success:
-            print("Conversion completed successfully.")
-        else:
-            print("Conversion completed with errors.")
-        
-        return success
-    
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        print(f"Error converting WAV to sheet music: {e}")
-        print(f"Error details:\n{error_details}")
-        return False
 
 
 def main():
