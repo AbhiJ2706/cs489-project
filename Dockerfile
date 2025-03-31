@@ -31,8 +31,9 @@ RUN apt-get update && apt-get install -y \
     libxcb1 \
     libgl1 \
     libasound2 \
-    && wget -q https://github.com/musescore/MuseScore/releases/download/v4.5.1/MuseScore-Studio-4.5.1.250800846-x86_64.AppImage -O /usr/local/bin/musescore \
+    && wget -q https://cdn.jsdelivr.net/musescore/v4.5.1/MuseScore-Studio-4.5.1.250800846-x86_64.AppImage -O /usr/local/bin/musescore \
     && chmod +x /usr/local/bin/musescore \
+    && ln -s /usr/local/bin/musescore /usr/local/bin/mscore \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Bun
