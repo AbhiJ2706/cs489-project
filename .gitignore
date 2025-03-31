@@ -3,6 +3,15 @@
 *.png
 *.wav
 *.midi
-*.mid
 *.DS_Store
-__pycache__
+!test-input.wav
+# Soundfont files
+*.sf2
+*.sf3
+*.dls
+# Large files
+FluidR3_GM.sf2
+README.txt
+copyright.txt
+src/cs489_project/__pycache__/
+
