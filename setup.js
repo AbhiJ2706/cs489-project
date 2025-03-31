@@ -38,12 +38,12 @@ if (!existsSync("FluidR3_GM.sf2")) {
 
 // Generate MusicXML from WAV
 runCommand(
-  "python src/cs489_project/wav_to_sheet_music.py test-input.wav output.musicxml"
+  "python src/cs489_project/wav_to_sheet_music.py test-input-10sec.wav output.musicxml"
 );
 
 // Generate PDF from MusicXML
 runCommand(
-  "python src/cs489_project/wav_to_sheet_music.py input.wav output.musicxml --pdf output.pdf"
+  "python src/cs489_project/wav_to_sheet_music.py test-input-10sec.wav output.musicxml --pdf output.pdf"
 );
 
 // Convert MusicXML back to WAV for playback

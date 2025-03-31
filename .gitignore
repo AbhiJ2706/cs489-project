@@ -4,7 +4,7 @@
 *.wav
 *.midi
 *.DS_Store
-!test-input.wav
+!test-input-10sec.wav
 # Soundfont files
 *.sf2
 *.sf3
