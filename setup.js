@@ -37,19 +37,15 @@ if (!existsSync("FluidR3_GM.sf2")) {
 }
 
 // Generate MusicXML from WAV
-runCommand(
-  "python src/cs489_project/wav_to_sheet_music.py test-input-10sec.wav output.musicxml"
-);
+runCommand("python wav_to_sheet_music.py test-input-10sec.wav output.musicxml");
 
 // Generate PDF from MusicXML
 runCommand(
-  "python src/cs489_project/wav_to_sheet_music.py test-input-10sec.wav output.musicxml --pdf output.pdf"
+  "python wav_to_sheet_music.py test-input-10sec.wav output.musicxml --pdf output.pdf"
 );
 
 // Convert MusicXML back to WAV for playback
 console.log("Converting MusicXML back to WAV for playback...");
-runCommand(
-  "python src/cs489_project/musicxml_to_wav.py output.musicxml output_synthesized.wav"
-);
+runCommand("python musicxml_to_wav.py output.musicxml output_synthesized.wav");
 
 console.log("Process completed!");
