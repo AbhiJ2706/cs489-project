@@ -9,10 +9,20 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     curl \
     unzip \
-    software-properties-common \
-    && add-apt-repository ppa:mscore-ubuntu/mscore-stable \
-    && apt-get update \
-    && apt-get install -y musescore4 \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download and install MuseScore
+RUN apt-get update && apt-get install -y \
+    libfreetype6 \
+    libfontconfig1 \
+    libx11-6 \
+    libxext6 \
+    libxcb1 \
+    libgl1 \
+    libasound2 \
+    && wget -q https://github.com/musescore/MuseScore/releases/download/v4.5.1/MuseScore-Studio-4.5.1.250800846-x86_64.AppImage -O /usr/local/bin/musescore \
+    && chmod +x /usr/local/bin/musescore \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Bun
