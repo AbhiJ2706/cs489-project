@@ -48,6 +48,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+async def home():
+    """
+    API home page.
+    
+    Returns:
+        dict: Basic information about the API
+    """
+    return {
+        "name": "DaScore API",
+        "description": "Convert between WAV audio and sheet music (MusicXML/PDF)",
+        "endpoints": {
+            "POST /convert": "Convert WAV file to sheet music",
+            "GET /download/{file_type}/{file_id}": "Download a converted file",
+            "GET /preview/{file_id}": "Preview PDF file",
+            "GET /musicxml-content/{file_id}": "Get MusicXML content",
+            "GET /synthesize/{file_id}": "Convert MusicXML to WAV audio",
+            "GET /audio/{file_id}": "Stream synthesized audio file",
+            "GET /check-files/{file_id}": "Check which files are available for a given file ID",
+            "DELETE /files/{file_id}": "Delete all files associated with a conversion"
+        },
+        "version": "1.0.0"
+    }
+
 class ConversionResult(BaseModel):
     """Model for conversion result response."""
     file_id: str
