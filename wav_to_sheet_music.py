@@ -197,7 +197,10 @@ def detect_notes_and_chords(audio_data, sample_rate):
                     piano.notes.append(note)
     
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
         print(f"Error detecting notes: {e}")
+        print(f"Error details:\n{error_details}")
         # Fallback to a simpler method if the above fails
         try:
             # Use pYIN for pitch detection
@@ -234,7 +237,10 @@ def detect_notes_and_chords(audio_data, sample_rate):
                         # Add the note to the piano instrument
                         piano.notes.append(note)
         except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
             print(f"Fallback method also failed: {e}")
+            print(f"Error details:\n{error_details}")
     
     # Add the instrument to the MIDI data
     midi_data.instruments.append(piano)
@@ -576,7 +582,10 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, note_
         
         return True
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
         print(f"Error generating sheet music: {e}")
+        print(f"Error details:\n{error_details}")
         return False
 
 
@@ -656,7 +665,10 @@ def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, outpu
         # Load the audio file
         print(f"Loading audio file: {input_wav}")
         audio_data, sample_rate = librosa.load(input_wav, sr=None, mono=True)
-
+        print(f"Sample rate: {sample_rate}")
+        
+        # Detect tempo
+        print("Detecting tempo...")
         tempo, _ = librosa.beat.beat_track(y=audio_data, sr=sample_rate)
 
         print(tempo)
@@ -695,7 +707,10 @@ def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, outpu
         return success
     
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
         print(f"Error converting WAV to sheet music: {e}")
+        print(f"Error details:\n{error_details}")
         return False
 
 
