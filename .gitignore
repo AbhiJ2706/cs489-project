@@ -5,3 +5,4 @@
 *.midi
 *.mid
 *.DS_Store
+__pycache__
