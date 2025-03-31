@@ -10,6 +10,16 @@ RUN apt-get update && apt-get install -y \
     curl \
     unzip \
     wget \
+    # Additional audio dependencies
+    libsndfile1-dev \
+    libasound2-dev \
+    libportaudio2 \
+    libportaudiocpp0 \
+    portaudio19-dev \
+    libavcodec-dev \
+    libavformat-dev \
+    libavutil-dev \
+    libswresample-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Download and install MuseScore
@@ -31,9 +41,11 @@ ENV PATH="/root/.bun/bin:${PATH}"
 
 # Copy requirements file
 COPY requirements.txt ./
+COPY audio-requirements.txt ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r audio-requirements.txt
 
 # Copy source code
 COPY . .
