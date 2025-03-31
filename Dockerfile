@@ -42,11 +42,9 @@ ENV PATH="/root/.bun/bin:${PATH}"
 
 # Copy requirements file
 COPY requirements.txt ./
-COPY audio-requirements.txt ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --no-cache-dir -r audio-requirements.txt
 
 # Copy source code
 COPY . .
