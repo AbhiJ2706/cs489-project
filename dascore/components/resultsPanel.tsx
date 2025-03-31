@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { FileDown, FileText, AlertCircle, RefreshCw, FileWarning, ExternalLink, Music } from "lucide-react";
 import Link from "next/link";
 import { AudioPlayer } from "./audioPlayer";
+import { apiFetch, apiUrl } from "../lib/apiUtils";
 
 interface ResultsPanelProps {
   fileId: string | null;
@@ -31,7 +32,7 @@ export function ResultsPanel({ fileId, onReset }: ResultsPanelProps) {
       setError(null);
       
       // Check which files are available
-      fetch(`http://localhost:8000/check-files/${fileId}`)
+      apiFetch(`check-files/${fileId}`)
         .then(response => {
           if (!response.ok) {
             throw new Error("Failed to check available files");
@@ -52,7 +53,7 @@ export function ResultsPanel({ fileId, onReset }: ResultsPanelProps) {
   const handleDownload = (fileType: "musicxml" | "pdf") => {
     if (!fileId || !availableFiles[fileType]) return;
     
-    const url = `http://localhost:8000/download/${fileType}/${fileId}`;
+    const url = apiUrl(`download/${fileType}/${fileId}`);
     const link = document.createElement("a");
     link.href = url;
     link.download = `sheet_music.${fileType}`;
@@ -91,7 +92,7 @@ export function ResultsPanel({ fileId, onReset }: ResultsPanelProps) {
               {availableFiles.pdf ? (
                 <div className="aspect-[3/4] w-full bg-muted rounded-md overflow-hidden">
                   <iframe 
-                    src={`http://localhost:8000/preview/${fileId}`}
+                    src={apiUrl(`preview/${fileId}`)}
                     className="w-full h-full border-0"
                     title="Sheet Music Preview"
                   />

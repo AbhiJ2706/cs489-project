@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { FileMusic, AlertCircle, Loader2 } from "lucide-react";
+import { apiFetch } from "../lib/apiUtils";
 
 interface ConversionPanelProps {
   file: File | null;
@@ -49,7 +50,7 @@ export function ConversionPanel({ file, onConversionComplete }: ConversionPanelP
       formData.append("title", title);
 
       // Send the file to the API
-      const response = await fetch("http://localhost:8000/convert", {
+      const response = await apiFetch("convert", {
         method: "POST",
         body: formData,
       });

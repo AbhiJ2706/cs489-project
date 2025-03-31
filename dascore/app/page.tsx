@@ -7,6 +7,7 @@ import { ConversionPanel } from "@/components/conversionPanel";
 import { ResultsPanel } from "@/components/resultsPanel";
 import { Toaster } from "@/components/ui/sonner";
 import { Music } from "lucide-react";
+import { apiFetch } from "@/lib/apiUtils";
 
 export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -18,7 +19,7 @@ export default function Home() {
     return () => {
       // Clean up any file IDs when component unmounts
       if (convertedFileId) {
-        fetch(`http://localhost:8000/files/${convertedFileId}`, {
+        apiFetch(`files/${convertedFileId}`, {
           method: "DELETE",
         }).catch(err => {
           console.error("Failed to clean up files:", err);
@@ -41,7 +42,7 @@ export default function Home() {
   const handleReset = () => {
     // Clean up the current file ID
     if (convertedFileId) {
-      fetch(`http://localhost:8000/files/${convertedFileId}`, {
+      apiFetch(`files/${convertedFileId}`, {
         method: "DELETE",
       }).catch(err => {
         console.error("Failed to clean up files:", err);
@@ -92,7 +93,7 @@ export default function Home() {
         </main>
 
         <footer className="mt-16 text-center text-sm text-muted-foreground">
-          <p>© 2024 DaScore. All rights reserved.</p>
+          <p> 2024 DaScore. All rights reserved.</p>
         </footer>
       </div>
       

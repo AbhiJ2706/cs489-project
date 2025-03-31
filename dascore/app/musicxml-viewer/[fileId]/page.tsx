@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { OpenSheetMusicDisplay } from "@/components/openSheetMusicDisplay";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, ArrowLeft, Download, RefreshCw } from "lucide-react";
 import Link from "next/link";
+import { apiFetch, apiUrl } from "@/lib/apiUtils";
 
 export default function MusicXMLViewer() {
   const { fileId } = useParams();
@@ -22,7 +23,7 @@ export default function MusicXMLViewer() {
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch(`http://localhost:8000/musicxml-content/${fileId}`);
+        const response = await apiFetch(`musicxml-content/${fileId}`);
         
         if (!response.ok) {
           throw new Error("Failed to load MusicXML content");
@@ -43,7 +44,7 @@ export default function MusicXMLViewer() {
   const handleDownload = () => {
     if (!fileId) return;
     
-    const url = `http://localhost:8000/download/musicxml/${fileId}`;
+    const url = apiUrl(`download/musicxml/${fileId}`);
     const link = document.createElement("a");
     link.href = url;
     link.download = "sheet_music.musicxml";

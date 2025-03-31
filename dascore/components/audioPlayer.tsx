@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Play, Pause, Volume2, VolumeX, RefreshCw, Download } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { apiFetch, apiUrl } from "@/lib/apiUtils";
 
 interface AudioPlayerProps {
   file?: File | null;
@@ -102,7 +103,7 @@ export function AudioPlayer({ file, fileId }: AudioPlayerProps) {
       setError(null);
       
       // First, request the server to synthesize audio from MusicXML
-      const response = await fetch(`http://localhost:8000/synthesize/${id}`);
+      const response = await apiFetch(`synthesize/${id}`);
       
       if (!response.ok) {
         const errorData = await response.json();
@@ -111,9 +112,9 @@ export function AudioPlayer({ file, fileId }: AudioPlayerProps) {
       
       const data = await response.json();
       
-      // Now get the audio URL
-      const audioPath = `http://localhost:8000${data.audio_url}`;
-      setAudioUrl(audioPath);
+      // Get the audio URL from the response - strip the leading slash if present
+      const audioUrlPath = data.audio_url.startsWith('/') ? data.audio_url.substring(1) : data.audio_url;
+      const audioPath = apiUrl(audioUrlPath);
       
       // Create new audio element with the URL
       setupAudioElement(audioPath);
