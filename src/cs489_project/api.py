@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from pydantic import BaseModel
-from .wav_to_sheet_music import wav_to_sheet_music
+from wav_to_sheet_music import wav_to_sheet_music
 import music21
 
 # Create temporary directory for storing files
