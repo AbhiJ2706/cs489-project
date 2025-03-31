@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM python:3.10-slim
 
 WORKDIR /app
 
@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y \
     libswresample-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install MuseScore from binary
+# Download and install MuseScore
 RUN apt-get update && apt-get install -y \
     libfreetype6 \
     libfontconfig1 \
@@ -33,8 +33,7 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     && wget -q https://cdn.jsdelivr.net/musescore/v4.5.1/MuseScore-Studio-4.5.1.250800846-x86_64.AppImage -O /usr/local/bin/musescore \
     && chmod +x /usr/local/bin/musescore \
-    && cd /usr/local/bin && ./musescore --appimage-extract \
-    && ln -s /usr/local/bin/squashfs-root/AppRun /usr/local/bin/mscore \
+    && ln -s /usr/local/bin/musescore /usr/local/bin/mscore \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Bun
