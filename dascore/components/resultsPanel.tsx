@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { FileDown, FileText, AlertCircle, RefreshCw, FileWarning, ExternalLink } from "lucide-react";
+import { FileDown, FileText, AlertCircle, RefreshCw, FileWarning, ExternalLink, Music } from "lucide-react";
 import Link from "next/link";
+import { AudioPlayer } from "./audioPlayer";
 
 interface ResultsPanelProps {
   fileId: string | null;
@@ -41,7 +42,7 @@ export function ResultsPanel({ fileId, onReset }: ResultsPanelProps) {
           setAvailableFiles(data);
           setIsLoading(false);
         })
-        .catch(err => {
+        .catch(() => {
           setError("Failed to load the converted files. Please try again.");
           setIsLoading(false);
         });
@@ -147,6 +148,20 @@ export function ResultsPanel({ fileId, onReset }: ResultsPanelProps) {
                   </Link>
                   <p className="text-xs text-muted-foreground mt-2 text-center">
                     Opens in a new tab with interactive sheet music viewer
+                  </p>
+                </div>
+              )}
+              
+              {/* Synthesized Audio Player */}
+              {availableFiles.musicxml && (
+                <div className="pt-4 border-t border-muted mt-4">
+                  <h3 className="text-sm font-medium flex items-center gap-2 mb-3">
+                    <Music className="h-4 w-4" />
+                    Listen to Synthesized Audio
+                  </h3>
+                  <AudioPlayer fileId={fileId} />
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
+                    Audio synthesized from the sheet music
                   </p>
                 </div>
               )}

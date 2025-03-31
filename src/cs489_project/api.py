@@ -13,11 +13,16 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from pydantic import BaseModel
 from wav_to_sheet_music import wav_to_sheet_music
+from musicxml_to_wav import musicxml_to_wav
 import music21
 
 # Create temporary directory for storing files
 TEMP_DIR = Path(tempfile.gettempdir()) / "audio_converter"
 TEMP_DIR.mkdir(exist_ok=True)
+
+# Get the absolute path to the project root directory
+PROJECT_ROOT = Path(__file__).parent.parent.parent.absolute()
+SOUNDFONT_PATH = PROJECT_ROOT / "FluidR3_GM.sf2"
 
 # Configure music21 to use a different PDF backend if MuseScore is not available
 try:
@@ -199,9 +204,65 @@ async def get_musicxml_content(file_id: str):
     with open(file_path, "r") as f:
         content = f.read()
     
-    return Response(
-        content=content,
-        media_type="text/xml"
+    return Response(content=content, media_type="text/xml")
+
+@app.get("/synthesize/{file_id}")
+async def synthesize_audio(file_id: str, background_tasks: BackgroundTasks):
+    """
+    Convert MusicXML to WAV audio for playback.
+    
+    Args:
+        file_id: ID of the MusicXML file to convert
+        
+    Returns:
+        dict: Status and audio URL for the frontend
+    """
+    musicxml_path = TEMP_DIR / f"{file_id}.musicxml"
+    wav_path = TEMP_DIR / f"{file_id}_synthesized.wav"
+    
+    if not musicxml_path.exists():
+        raise HTTPException(status_code=404, detail="MusicXML file not found")
+    
+    # Check if synthesized audio already exists
+    if not wav_path.exists():
+        # Convert MusicXML to WAV
+        success = musicxml_to_wav(
+            str(musicxml_path), 
+            str(wav_path),
+            soundfont_path=str(SOUNDFONT_PATH)  # Pass the absolute path to the soundfont
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to synthesize audio from MusicXML"
+            )
+    
+    return {
+        "status": "success",
+        "audio_url": f"/audio/{file_id}"
+    }
+
+@app.get("/audio/{file_id}")
+async def get_audio(file_id: str):
+    """
+    Stream the synthesized audio file.
+    
+    Args:
+        file_id: ID of the audio file
+        
+    Returns:
+        FileResponse: The audio file
+    """
+    wav_path = TEMP_DIR / f"{file_id}_synthesized.wav"
+    
+    if not wav_path.exists():
+        raise HTTPException(status_code=404, detail="Synthesized audio not found")
+    
+    return FileResponse(
+        path=wav_path,
+        media_type="audio/wav",
+        filename="synthesized_sheet_music.wav"
     )
 
 @app.get("/check-files/{file_id}")
@@ -249,4 +310,4 @@ def run_server():
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
 if __name__ == "__main__":
-    run_server() 
+    run_server()
