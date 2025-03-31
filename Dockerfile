@@ -9,6 +9,10 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     curl \
     unzip \
+    software-properties-common \
+    && add-apt-repository ppa:mscore-ubuntu/mscore-stable \
+    && apt-get update \
+    && apt-get install -y musescore4 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Bun
