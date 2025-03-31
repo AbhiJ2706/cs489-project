@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 from music21 import stream, note, meter, tempo, metadata, duration, converter, chord, clef, instrument
 from scipy.signal import butter, filtfilt
+import xml.etree.ElementTree as ET
 
 def preprocess_audio(audio_data, sample_rate):
     """
@@ -112,13 +113,16 @@ def detect_notes_and_chords(audio_data, sample_rate):
         
         # Detect onsets
         try:
+            onset_strength = librosa.onset.onset_strength(y=audio_data, sr=sample_rate, hop_length=512)
             # Try with standard parameters
             onsets = librosa.onset.onset_detect(
                 y=audio_data, 
                 sr=sample_rate,
                 hop_length=hop_length,
-                backtrack=True
+                backtrack=True,
+                onset_envelope=np.where(onset_strength >= 0.85, onset_strength, 0)
             )
+
         except TypeError:
             # Fallback if the API has changed
             onsets = librosa.onset.onset_detect(
@@ -186,6 +190,8 @@ def detect_notes_and_chords(audio_data, sample_rate):
                         start=start_time,
                         end=end_time
                     )
+
+                    print(note)
                     
                     # Add the note to the piano instrument
                     piano.notes.append(note)
@@ -264,7 +270,7 @@ def quantize_notes(midi_data, ticks_per_beat=480, beats_per_measure=4):
         notes_by_start = {}
         for note in instrument.notes:
             start_beat = midi_data.time_to_tick(note.start) / ticks_per_beat
-            quantized_start_beat = round(start_beat * 4) / 4  # Quantize to quarter notes
+            quantized_start_beat = round(start_beat * 16) / 16  # Quantize to quarter notes
             
             if quantized_start_beat not in notes_by_start:
                 notes_by_start[quantized_start_beat] = []
@@ -275,7 +281,7 @@ def quantize_notes(midi_data, ticks_per_beat=480, beats_per_measure=4):
             # Quantize the end time for each note
             for note in notes:
                 end_beat = midi_data.time_to_tick(note.end) / ticks_per_beat
-                quantized_end_beat = round(end_beat * 4) / 4
+                quantized_end_beat = round(end_beat * 16) / 16
                 
                 # Ensure minimum note duration
                 if quantized_end_beat <= start_beat:
@@ -292,6 +298,8 @@ def quantize_notes(midi_data, ticks_per_beat=480, beats_per_measure=4):
                     start=quantized_start,
                     end=quantized_end
                 )
+
+                print(quantized_note)
                 
                 quantized_instrument.notes.append(quantized_note)
         
@@ -367,7 +375,7 @@ def identify_chords(notes, max_time_diff=0.05):
     return chords, remaining_notes
 
 
-def midi_to_musicxml(midi_data, title="Transcribed Music"):
+def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
     """
     Convert MIDI data to MusicXML focusing only on melody.
     
@@ -392,7 +400,9 @@ def midi_to_musicxml(midi_data, title="Transcribed Music"):
     # Add clef, time signature and tempo
     melody_part.append(clef.TrebleClef())
     melody_part.append(meter.TimeSignature('4/4'))
-    melody_part.append(tempo.MetronomeMark(number=120))
+    melody_part.append(tempo.MetronomeMark(number=tp))
+
+    note_list = []
     
     # Get the notes from the first instrument
     if midi_data.instruments and midi_data.instruments[0].notes:
@@ -421,40 +431,45 @@ def midi_to_musicxml(midi_data, title="Transcribed Music"):
         # For each time point, take the highest note (melody)
         for time_point in time_points:
             notes_at_time = notes_by_time[time_point]
+            
             if notes_at_time:
                 # Get the highest note (highest pitch = melody)
-                melody_note = max(notes_at_time, key=lambda x: x.pitch)
-                
-                # Calculate duration
-                note_duration = melody_note.end - melody_note.start
-                
-                # Create a music21 note
-                m21_note = note.Note(melody_note.pitch)
-                
-                # Set duration
-                if note_duration <= 0.25:
-                    m21_note.duration = duration.Duration(type='16th')
-                    current_time += 0.25
-                elif note_duration <= 0.5:
-                    m21_note.duration = duration.Duration(type='eighth')
-                    current_time += 0.5
-                elif note_duration <= 1.0:
-                    m21_note.duration = duration.Duration(type='quarter')
-                    current_time += 1.0
-                elif note_duration <= 2.0:
-                    m21_note.duration = duration.Duration(type='half')
-                    current_time += 2.0
-                else:
-                    m21_note.duration = duration.Duration(type='whole')
-                    current_time += 4.0
-                
-                # Add the note to the current measure
-                current_measure.append(m21_note)
+                for n in notes_at_time:
+                    melody_note = n #max(notes_at_time, key=lambda x: x.pitch)
+                    
+                    # Calculate duration
+                    note_duration = melody_note.end - melody_note.start
+                    
+                    # Create a music21 note
+                    m21_note = note.Note(melody_note.pitch)
+                    
+                    # Set duration
+                    if note_duration <= 0.25:
+                        m21_note.duration = duration.Duration(type='16th')
+                        current_time += 0.25
+                    elif note_duration <= 0.5:
+                        m21_note.duration = duration.Duration(type='eighth')
+                        current_time += 0.5
+                    elif note_duration <= 1.0:
+                        m21_note.duration = duration.Duration(type='quarter')
+                        current_time += 1.0
+                    elif note_duration <= 2.0:
+                        m21_note.duration = duration.Duration(type='half')
+                        current_time += 2.0
+                    else:
+                        m21_note.duration = duration.Duration(type='whole')
+                        current_time += 4.0
+                    
+                    # Add the note to the current measure
+                    current_measure.append(m21_note)
 
-                if current_measure.duration.quarterLength >= 4.0:
-                    melody_part.append(current_measure)
-                    measure_count += 1
-                    current_measure = stream.Measure(number=measure_count)
+                    note_list.append(m21_note)
+
+                    if current_time >= 4.0:
+                        melody_part.append(current_measure)
+                        measure_count += 1
+                        current_measure = stream.Measure(number=measure_count)
+                        current_time = 0.0
 
     else:
         # If no notes were detected, add a placeholder rest
@@ -463,18 +478,20 @@ def midi_to_musicxml(midi_data, title="Transcribed Music"):
         current_measure.append(placeholder)
         melody_part.append(current_measure)
         measure_count += 1
+        note_list.append(placeholder)
         current_measure = stream.Measure(number=measure_count)
-        current_time += 4.0
-    
-    # Add the measure to the melody part
     
     # Add the melody part to the score
     score.append(melody_part)
     
-    return score
+    return score, note_list
 
 
-def generate_sheet_music(score, output_xml, output_pdf=None):
+def item_to_pitch(item):
+    return item.find("step").text + ["", "#", "-"][int(item.find("alter").text)] + item.find("octave").text
+        
+
+def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, note_list: list[note.Note] = []):
     """
     Generate sheet music from a music21 score.
     
@@ -492,40 +509,51 @@ def generate_sheet_music(score, output_xml, output_pdf=None):
         if output_dir and not os.path.exists(output_dir):
             os.makedirs(output_dir)
         
-        # Try to write MusicXML file using the simplest possible approach
-        try:
-            # Make sure we have at least one measure in each part
-            for part in score.parts:
-                if len(part.getElementsByClass('Measure')) == 0:
-                    print("Warning: Part has no measures. Adding a measure...")
-                    m = stream.Measure(number=1)
-                    if len(part.getElementsByClass(['Note', 'Rest'])) == 0:
-                        # Add a placeholder rest if there are no notes
-                        r = note.Rest()
-                        r.duration = duration.Duration(type='whole')
-                        m.append(r)
-                    else:
-                        # Move existing notes to the measure
-                        for n in part.getElementsByClass(['Note', 'Rest']):
-                            m.append(n)
-                    part.append(m)
-            
-            # Write the file
-            score.write(fmt='musicxml', fp=output_xml)
-            print(f"MusicXML file saved as: {output_xml}")
-        except Exception as e:
-            print(f"Error writing MusicXML: {e}")
-            print("Trying alternative export method...")
-            
-            # Last resort: try to write a MIDI file instead
-            midi_path = output_xml.replace('.musicxml', '.mid').replace('.xml', '.mid')
-            try:
-                score.write('midi', fp=midi_path)
-                print(f"Fallback to MIDI file: {midi_path}")
-                print("You can open this MIDI file in any notation software to generate sheet music.")
-            except Exception as e2:
-                print(f"Failed to write any output file: {e2}")
-                return False
+        for part in score.parts:
+            if len(part.getElementsByClass('Measure')) == 0:
+                print("Warning: Part has no measures. Adding a measure...")
+                m = stream.Measure(number=1)
+                if len(part.getElementsByClass(['Note', 'Rest'])) == 0:
+                    # Add a placeholder rest if there are no notes
+                    r = note.Rest()
+                    r.duration = duration.Duration(type='whole')
+                    m.append(r)
+                else:
+                    # Move existing notes to the measure
+                    for n in part.getElementsByClass(['Note', 'Rest']):
+                        m.append(n)
+                part.append(m)
+        
+        # Write the file
+        score.write(fmt='musicxml', fp=output_xml)
+        print(f"MusicXML file saved as: {output_xml}")
+
+        tree = ET.parse(output_xml)
+        root = tree.getroot()
+
+        # import pdb; pdb.set_trace()
+
+        # print(root.items())
+
+        note_index = 0
+
+        for child in root:
+            if child.tag == "part":
+                for measure in child:
+                    removal = []
+                    for note in measure:
+                        if note.tag == "note":
+                            for pitch in note:
+                                if pitch.tag == "pitch":
+                                    print(item_to_pitch(pitch), note_list[note_index], note_list[note_index].pitch, type(note_list[note_index].pitch))
+                                    if item_to_pitch(pitch) == str(note_list[note_index].pitch):
+                                        note_index += 1
+                                    else:
+                                        removal.append(note)
+                    for r in removal:
+                        measure.remove(r)
+        
+        tree.write(output_xml)
         
         # If PDF output is requested, try to generate it
         if output_pdf:
@@ -564,14 +592,40 @@ def visualize_audio(audio_data, sample_rate, output_image=None):
     plt.figure(figsize=(12, 8))
     
     # Plot waveform
-    plt.subplot(2, 1, 1)
-    librosa.display.waveshow(audio_data, sr=sample_rate)
+    plt.subplot(3, 1, 1)
+    librosa.display.waveshow(audio_data[:30*44100], sr=sample_rate)
     plt.title('Waveform')
     plt.xlabel('Time (s)')
     plt.ylabel('Amplitude')
+
+    onset_strength = librosa.onset.onset_strength(y=audio_data[:30*44100], sr=sample_rate, hop_length=512)
+
+    onsets = librosa.frames_to_time(
+        librosa.onset.onset_detect(
+            y=audio_data[:30*44100], 
+            sr=sample_rate, 
+            hop_length=512, 
+            backtrack=True, 
+            onset_envelope=np.where(onset_strength >= 0.85, onset_strength, 0)
+        ), 
+        sr=sample_rate, 
+        hop_length=512
+    )
+    for onset in onsets:
+        plt.axvline(x=onset, color="red")
+
+    plt.subplot(3, 1, 2)
+    plt.title('Waveform')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Amplitude')
+    onsets = librosa.onset.onset_strength(y=audio_data[:30*44100], sr=sample_rate, hop_length=512)
+    peaks = find_peaks(np.array(onsets.reshape(-1,)))[0]
+    mask = np.zeros(onsets.size, dtype=bool)
+    mask[peaks] = True
+    plt.plot(np.where(mask, onsets, 0))
     
     # Plot spectrogram
-    plt.subplot(2, 1, 2)
+    plt.subplot(3, 1, 3)
     D = librosa.amplitude_to_db(np.abs(librosa.stft(audio_data)), ref=np.max)
     librosa.display.specshow(D, sr=sample_rate, x_axis='time', y_axis='log')
     plt.colorbar(format='%+2.0f dB')
@@ -602,6 +656,10 @@ def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, outpu
         # Load the audio file
         print(f"Loading audio file: {input_wav}")
         audio_data, sample_rate = librosa.load(input_wav, sr=None, mono=True)
+
+        tempo, _ = librosa.beat.beat_track(y=audio_data, sr=sample_rate)
+
+        print(tempo)
         
         # Set a default title if none provided
         if title is None:
@@ -617,11 +675,11 @@ def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, outpu
         
         # Convert to MusicXML
         print("Converting to MusicXML...")
-        score = midi_to_musicxml(midi_data, title=title)
+        score, note_list = midi_to_musicxml(midi_data, title=title, tp=tempo[0])
         
         # Generate sheet music
         print("Generating sheet music...")
-        success = generate_sheet_music(score, output_xml, output_pdf)
+        success = generate_sheet_music(score, output_xml, output_pdf, note_list)
         
         # Visualize audio if requested
         if visualize:
