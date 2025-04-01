@@ -1,0 +1,23 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "librosa",
+  "numpy",
+  "soundfile",
+  "scipy",
+  "matplotlib",
+  "pretty_midi",
+  "noisereduce",
+  "pedalboard",
+  "music21",
+  "fastapi[standard]>=0.95.0",
+  "uvicorn>=0.22.0",
+  "python-multipart",
+  "ffmpeg-python",
+  "yt-dlp",
+  "python-ffmpeg>=2.0.12",
+]

@@ -3,6 +3,7 @@
 *.png
 *.wav
 *.midi
+*.mid
 *.DS_Store
 !test-input-10sec.wav
 # Soundfont files
