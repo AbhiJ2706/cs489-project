@@ -5,6 +5,7 @@ FastAPI backend for WAV to Sheet Music conversion.
 import os
 import tempfile
 import shutil
+import subprocess
 from pathlib import Path
 from typing import List, Optional
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
@@ -15,6 +16,8 @@ from pydantic import BaseModel
 from wav_to_sheet_music import wav_to_sheet_music
 from musicxml_to_wav import musicxml_to_wav
 import music21
+import yt_dlp
+import ffmpeg
 
 # Create temporary directory for storing files
 TEMP_DIR = Path(tempfile.gettempdir()) / "audio_converter"
@@ -61,11 +64,13 @@ async def home():
         "description": "Convert between WAV audio and sheet music (MusicXML/PDF)",
         "endpoints": {
             "POST /convert": "Convert WAV file to sheet music",
+            "POST /convert-youtube": "Convert YouTube video audio to sheet music",
             "GET /download/{file_type}/{file_id}": "Download a converted file",
             "GET /preview/{file_id}": "Preview PDF file",
             "GET /musicxml-content/{file_id}": "Get MusicXML content",
             "GET /synthesize/{file_id}": "Convert MusicXML to WAV audio",
             "GET /audio/{file_id}": "Stream synthesized audio file",
+            "GET /uploads/{file_id}": "Stream original uploaded audio file",
             "GET /check-files/{file_id}": "Check which files are available for a given file ID",
             "DELETE /files/{file_id}": "Delete all files associated with a conversion"
         },
@@ -77,6 +82,11 @@ class ConversionResult(BaseModel):
     file_id: str
     message: str
     has_pdf: bool = False
+
+class YouTubeUrl(BaseModel):
+    """Model for YouTube URL input."""
+    url: str
+    title: Optional[str] = None
 
 @app.post("/convert", response_model=ConversionResult)
 async def convert_audio(file: UploadFile = File(...), title: Optional[str] = None):
@@ -147,6 +157,115 @@ async def convert_audio(file: UploadFile = File(...), title: Optional[str] = Non
         raise HTTPException(
             status_code=500,
             detail=f"Conversion failed: {str(e)}"
+        )
+
+@app.post("/convert-youtube", response_model=ConversionResult)
+async def convert_youtube(youtube_data: YouTubeUrl):
+    """
+    Download audio from a YouTube URL, convert to WAV, and generate sheet music.
+    
+    Args:
+        youtube_data: The YouTube URL to process
+        
+    Returns:
+        ConversionResult: File ID and status message
+    """
+    url = youtube_data.url
+    title = youtube_data.title
+    
+    # Create unique file ID and paths
+    file_id = f"{os.urandom(4).hex()}"
+    temp_dir = TEMP_DIR / file_id
+    temp_dir.mkdir(exist_ok=True)
+    
+    wav_path = TEMP_DIR / f"{file_id}.wav"
+    musicxml_path = TEMP_DIR / f"{file_id}.musicxml"
+    pdf_path = TEMP_DIR / f"{file_id}.pdf"
+    
+    try:
+        # Configure yt-dlp options
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': str(temp_dir / 'download.%(ext)s'),
+            'noplaylist': True,
+            'quiet': True,
+            'no_warnings': True,
+        }
+        
+        # Download audio from YouTube
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            
+            # If title wasn't provided, use the video title
+            if not title:
+                title = info.get('title', 'YouTube Audio')
+            
+            # Get the downloaded file path
+            downloaded_file = temp_dir / f"download.{info.get('ext', 'webm')}"
+            
+            # Convert to WAV using ffmpeg
+            try:
+                ffmpeg.input(str(downloaded_file)).output(
+                    str(wav_path), 
+                    ar=44100,  # Audio sample rate
+                    ac=2,      # Stereo audio
+                    acodec='pcm_s16le'  # 16-bit PCM encoding for WAV
+                ).overwrite_output().run(quiet=True, capture_stdout=True, capture_stderr=True)
+            except ffmpeg.Error:
+                # If the ffmpeg-python library fails, fall back to subprocess
+                subprocess.run([
+                    'ffmpeg', '-i', str(downloaded_file), 
+                    '-ar', '44100', '-ac', '2', 
+                    '-acodec', 'pcm_s16le', str(wav_path),
+                    '-y', '-loglevel', 'error'
+                ], check=True)
+        
+        # Clean up downloaded file
+        if downloaded_file.exists():
+            downloaded_file.unlink()
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
+        
+        # Convert WAV to sheet music
+        success = wav_to_sheet_music(
+            str(wav_path),
+            str(musicxml_path),
+            title=title,
+            output_pdf=str(pdf_path)
+        )
+        
+        # Check if conversion was successful for MusicXML
+        if not success or not musicxml_path.exists():
+            raise HTTPException(
+                status_code=500, 
+                detail="Conversion failed. Please try a different YouTube video."
+            )
+        
+        # Check if PDF was generated
+        has_pdf = pdf_path.exists()
+        
+        # If PDF generation failed but MusicXML succeeded, we can still return success
+        message = "YouTube audio conversion successful"
+        if not has_pdf:
+            message += " (PDF generation failed, but MusicXML is available)"
+        
+        return ConversionResult(
+            file_id=file_id,
+            message=message,
+            has_pdf=has_pdf
+        )
+    
+    except Exception as e:
+        # Clean up any created files
+        for path in [wav_path, musicxml_path, pdf_path]:
+            if path.exists():
+                path.unlink()
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
+        
+        raise HTTPException(
+            status_code=500,
+            detail=f"YouTube conversion failed: {str(e)}"
         )
 
 @app.get("/download/{file_type}/{file_id}")
@@ -289,6 +408,29 @@ async def get_audio(file_id: str):
         filename="synthesized_sheet_music.wav"
     )
 
+@app.get("/uploads/{file_id}")
+async def get_original_audio(file_id: str):
+    """
+    Stream the original uploaded audio file.
+    
+    Args:
+        file_id: ID of the original audio file
+        
+    Returns:
+        FileResponse: The original audio file
+    """
+    # Check for original uploaded file
+    wav_path = TEMP_DIR / f"{file_id}.wav"
+    
+    if not wav_path.exists():
+        raise HTTPException(status_code=404, detail="Original audio file not found")
+    
+    return FileResponse(
+        path=wav_path,
+        media_type="audio/wav",
+        filename="original_audio.wav"
+    )
+
 @app.get("/check-files/{file_id}")
 async def check_files(file_id: str):
     """
@@ -302,7 +444,7 @@ async def check_files(file_id: str):
     """
     available_files = {}
     
-    for ext in ["musicxml", "pdf"]:
+    for ext in ["musicxml", "pdf", "wav"]:
         file_path = TEMP_DIR / f"{file_id}.{ext}"
         available_files[ext] = file_path.exists()
     
@@ -321,7 +463,7 @@ async def delete_files(file_id: str):
     """
     deleted_files = []
     
-    for ext in ["wav", "musicxml", "pdf"]:
+    for ext in ["wav", "musicxml", "pdf", "wav"]:
         file_path = TEMP_DIR / f"{file_id}.{ext}"
         if file_path.exists():
             file_path.unlink()

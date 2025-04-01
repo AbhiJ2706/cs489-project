@@ -1,16 +1,12 @@
-"use client";
-
 import { useState, useEffect } from "react";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { toast } from "sonner";
-import { FileDown, FileText, AlertCircle, RefreshCw, FileWarning, ExternalLink, Music } from "lucide-react";
-import { AudioPlayer } from "./audioPlayer";
-import { apiFetch, apiUrl } from "../lib/apiUtils";
+import { Download, FileText, RefreshCw, Trash } from "lucide-react";
+import { apiFetch, apiUrl } from "@/lib/apiUtils";
+import Link from "next/link";
 
 interface ResultsPanelProps {
-  fileId: string | null;
+  fileId: string;
   originalFile?: File | null;
   onReset: () => void;
 }
@@ -23,10 +19,10 @@ interface AvailableFiles {
 export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProps) {
   const [availableFiles, setAvailableFiles] = useState<AvailableFiles>({
     musicxml: false,
-    pdf: false
+    pdf: false,
   });
-  const [isLoading, setIsLoading] = useState(true);
   const [originalAudioUrl, setOriginalAudioUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,22 +31,16 @@ export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProp
     const fetchFileStatus = async () => {
       try {
         setIsLoading(true);
-        const response = await apiFetch(`check-files/${fileId}`);
-        
-        if (!response.ok) {
-          throw new Error("Failed to fetch file status");
-        }
-        
-        const data = await response.json();
+        // The apiFetch function now handles JSON parsing
+        const data = await apiFetch<AvailableFiles>(`check-files/${fileId}`);
+
         setAvailableFiles({
-          musicxml: data.musicxml || false,
-          pdf: data.pdf || false
+          musicxml: Boolean(data.musicxml),
+          pdf: Boolean(data.pdf)
         });
-        
-        if (fileId) {
-          setOriginalAudioUrl(apiUrl(`uploads/${fileId}.wav`));
-        }
-        
+
+        // Set the audio URL
+        setOriginalAudioUrl(apiUrl(`uploads/${fileId}`));
         setIsLoading(false);
       } catch (error) {
         console.error("Error fetching file status:", error);
@@ -60,176 +50,163 @@ export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProp
     };
 
     fetchFileStatus();
-    
+
   }, [fileId]);
 
   const handleDownload = async (fileType: "musicxml" | "pdf") => {
     if (!fileId) return;
-    
-    const url = apiUrl(`download/${fileType}/${fileId}`);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `sheet_music.${fileType}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast.success(`${fileType.toUpperCase()} file downloaded successfully!`);
+
+    const url = apiUrl(`files/${fileId}?type=${fileType}`);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${fileId}.${fileType === "musicxml" ? "xml" : "pdf"}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
-  if (!fileId) {
-    return null;
+  const handleDelete = async () => {
+    if (!fileId) return;
+
+    try {
+      await apiFetch(`files/${fileId}`, {
+        method: "DELETE",
+      });
+      onReset();
+    } catch (error) {
+      console.error("Error deleting files:", error);
+      setError("Failed to delete files");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="w-full max-w-md mx-auto mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <RefreshCw className="h-5 w-5 animate-spin" />
+            Loading Results
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-4">
+            <p className="text-sm text-muted-foreground">
+              Please wait while we fetch your conversion results...
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="w-full max-w-md mx-auto mt-6">
+        <CardHeader>
+          <CardTitle className="text-red-500">Error</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>{error}</p>
+          <Button onClick={onReset} className="mt-4">
+            Try Again
+          </Button>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto mt-6">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5" />
-          Conversion Results
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {error ? (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          ) : isLoading ? (
-            <div className="flex justify-center py-8">
-              <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {availableFiles.pdf ? (
-                <div className="aspect-[3/4] w-full bg-muted rounded-md overflow-hidden">
-                  <iframe 
-                    src={apiUrl(`preview/${fileId}`)}
-                    className="w-full h-full border-0"
-                    title="Sheet Music Preview"
-                  />
-                </div>
-              ) : (
-                <div className="aspect-[3/4] w-full bg-muted/30 rounded-md flex flex-col items-center justify-center p-6 text-center">
-                  <FileWarning className="h-16 w-16 text-amber-500 mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">PDF Preview Unavailable</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    PDF generation failed due to missing MuseScore or Lilypond. 
-                    You can still download the MusicXML file and open it in your preferred music notation software.
-                  </p>
-                  <Alert className="text-left bg-amber-50 border-amber-200 text-amber-800">
-                    <AlertTitle>Tip</AlertTitle>
-                    <AlertDescription>
-                      To view MusicXML files, you can use software like MuseScore, Finale, or Sibelius, 
-                      or online tools like Flat.io or Noteflight.
-                    </AlertDescription>
-                  </Alert>
-                </div>
-              )}
-              
-              <div className="flex flex-col gap-2">
-                <p className="text-sm font-medium">Download Options:</p>
-                <div className="flex gap-2">
-                  {availableFiles.pdf && (
-                    <Button 
-                      variant="outline" 
-                      className="flex-1"
-                      onClick={() => handleDownload("pdf")}
-                    >
-                      <FileDown className="mr-2 h-4 w-4" />
-                      PDF
-                    </Button>
-                  )}
-                  <Button 
-                    variant={availableFiles.pdf ? "outline" : "default"}
-                    className="flex-1"
+    <>
+      <Card className="w-full max-w-md mx-auto mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Conversion Results
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            {originalAudioUrl && (
+              <div>
+                <h3 className="text-sm font-medium mb-2">Original Audio</h3>
+                <audio
+                  src={originalAudioUrl}
+                  controls
+                  className="w-full"
+                  title={originalFile?.name || "Original Audio.wav"}
+                />
+              </div>
+            )}
+
+            <div>
+              <h3 className="text-sm font-medium mb-2">Sheet Music</h3>
+              <div className="grid grid-cols-2 gap-3">
+                {availableFiles.musicxml && (
+                  <Button
+                    variant="outline"
                     onClick={() => handleDownload("musicxml")}
+                    className="flex items-center gap-2"
                   >
-                    <FileDown className="mr-2 h-4 w-4" />
+                    <Download className="h-4 w-4" />
                     MusicXML
                   </Button>
-                </div>
-              </div>
+                )}
 
-              {availableFiles.musicxml && (
-                <div className="pt-2">
-                  <Button 
-                    variant="secondary" 
-                    size="sm" 
-                    className="w-full"
+                {availableFiles.pdf && (
+                  <Button
+                    variant="outline"
+                    onClick={() => handleDownload("pdf")}
+                    className="flex items-center gap-2"
                   >
-                    <a 
-                      href={`/view?id=${fileId}&type=musicxml`}
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                    >
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Open Sheet Music Viewer
-                    </a>
+                    <Download className="h-4 w-4" />
+                    PDF
                   </Button>
-                  <p className="text-xs text-muted-foreground mt-2 text-center">
-                    Opens in a new tab with interactive sheet music viewer
-                  </p>
-                </div>
-              )}
-              
-              {/* Audio Players - Side by Side */}
-              <div className="pt-4 border-t border-muted mt-4">
-                <h3 className="text-sm font-medium flex items-center gap-2 mb-3">
-                  <Music className="h-4 w-4" />
-                  Compare Original vs Synthesized Audio
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Original Audio Player */}
-                  <div className="flex flex-col">
-                    <div className="text-center font-medium mb-2">
-                      Original Audio
-                    </div>
-                    {originalFile ? (
-                      <AudioPlayer file={originalFile} />
-                    ) : originalAudioUrl ? (
-                      <audio 
-                        controls 
-                        src={originalAudioUrl} 
-                        className="w-full"
-                      ></audio>
-                    ) : (
-                      <AudioPlayer fileId={fileId} originalAudio={true} />
-                    )}
-                    <p className="text-xs text-muted-foreground mt-2 text-center">
-                      Original uploaded audio file
-                    </p>
-                  </div>
-                  
-                  {/* Synthesized Audio Player */}
-                  {availableFiles.musicxml && (
-                    <div className="flex flex-col">
-                      <div className="text-center font-medium mb-2">
-                        Synthesized Audio
-                      </div>
-                      <AudioPlayer fileId={fileId} />
-                      <p className="text-xs text-muted-foreground mt-2 text-center">
-                        Audio synthesized from the sheet music
-                      </p>
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
             </div>
-          )}
-        </div>
-      </CardContent>
-      <CardFooter>
-        <Button 
-          onClick={onReset} 
-          className="w-full"
-          variant="secondary"
-        >
-          Convert Another File
-        </Button>
-      </CardFooter>
-    </Card>
+
+            {availableFiles.musicxml && (
+              <div>
+                <h3 className="text-sm font-medium mb-2">Preview</h3>
+                <Link href={`/musicxml-viewer/${fileId}`} target="_blank">
+                  <Button className="w-full" variant="outline">
+                    Open MusicXML Viewer
+                  </Button>
+                </Link>
+              </div>
+            )}
+
+            <div className="pt-2 flex gap-2">
+              <Button
+                onClick={onReset}
+                variant="default"
+                className="flex-1"
+              >
+                Try Another
+              </Button>
+
+              <Button
+                onClick={handleDelete}
+                variant="destructive"
+                className="flex items-center gap-1"
+              >
+                <Trash className="h-4 w-4" />
+                Delete
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={onReset}
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Start Over
+          </Button>
+        </CardFooter>
+      </Card>
+    </>
   );
 }

@@ -35,11 +35,30 @@ export const apiUrl = (path: string): string => {
  * @param options - Standard fetch options
  * @returns Promise with the fetch response
  */
-export const apiFetch = (
+export const apiFetch = async <T = any>(
   path: string,
   options?: RequestInit
-): Promise<Response> => {
-  return fetch(apiUrl(path), options);
+): Promise<T> => {
+  const response = await fetch(apiUrl(path), options);
+  
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status} ${response.statusText}`);
+  }
+  
+  // For non-JSON responses (like file downloads)
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    return response as unknown as T;
+  }
+  
+  // Parse JSON for JSON responses
+  try {
+    const data = await response.json();
+    return data as T;
+  } catch (error) {
+    console.error('Error parsing JSON response:', error);
+    throw new Error('Failed to parse API response as JSON');
+  }
 };
 
 /**
@@ -49,10 +68,10 @@ export const apiFetch = (
  */
 export const apiDownload = (path: string, filename: string): void => {
   const url = apiUrl(path);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 };
