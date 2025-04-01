@@ -20,10 +20,6 @@ function runCommand(command) {
 // Main execution
 console.log("Starting audio processing pipeline...");
 
-// Install Python dependencies from requirements.txt
-console.log("Installing Python dependencies from requirements.txt...");
-runCommand("pip install -r requirements.txt");
-
 // Download and extract FluidR3_GM soundfont if it doesn't exist
 if (!existsSync("FluidR3_GM.sf2")) {
   console.log("Downloading FluidR3_GM soundfont...");
@@ -35,17 +31,5 @@ if (!existsSync("FluidR3_GM.sf2")) {
   console.log("Cleaning up zip file...");
   runCommand("rm FluidR3_GM.zip");
 }
-
-// Generate MusicXML from WAV
-runCommand("python wav_to_sheet_music.py test-input-10sec.wav output.musicxml");
-
-// Generate PDF from MusicXML
-runCommand(
-  "python wav_to_sheet_music.py test-input-10sec.wav output.musicxml --pdf output.pdf"
-);
-
-// Convert MusicXML back to WAV for playback
-console.log("Converting MusicXML back to WAV for playback...");
-runCommand("python musicxml_to_wav.py output.musicxml output_synthesized.wav");
 
 console.log("Process completed!");

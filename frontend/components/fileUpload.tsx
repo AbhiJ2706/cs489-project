@@ -276,6 +276,23 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
                 </div>
               )}
               
+              {/* Spotify connection button */}
+              <div className="flex items-center gap-2 my-4 p-3 border border-dashed border-green-500/30 rounded-lg bg-green-500/5">
+                <Music2 className="h-5 w-5 text-green-500" />
+                <div className="flex-1">
+                  <h4 className="text-sm font-medium">Connect Spotify Account</h4>
+                  <p className="text-xs text-muted-foreground">Sign in to access your playlists and favorites</p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="bg-green-500/10 border-green-500/20 hover:bg-green-500/20 text-green-600"
+                  onClick={() => window.open('https://accounts.spotify.com/authorize?client_id=YOUR_CLIENT_ID&response_type=code&redirect_uri=YOUR_REDIRECT_URI&scope=user-read-private%20user-read-email%20playlist-read-private', '_blank')}
+                >
+                  Connect
+                </Button>
+              </div>
+              
               {urlError && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
