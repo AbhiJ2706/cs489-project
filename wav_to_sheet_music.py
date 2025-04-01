@@ -573,10 +573,14 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, note_
                         if note.tag == "note":
                             for pitch in note:
                                 if pitch.tag == "pitch":
-                                    print(item_to_pitch(pitch), note_list[note_index], note_list[note_index].pitch, type(note_list[note_index].pitch))
-                                    if item_to_pitch(pitch) == str(note_list[note_index].pitch):
-                                        note_index += 1
+                                    if note_index < len(note_list):  # Check if index is within bounds
+                                        print(item_to_pitch(pitch), note_list[note_index], note_list[note_index].pitch, type(note_list[note_index].pitch))
+                                        if item_to_pitch(pitch) == str(note_list[note_index].pitch):
+                                            note_index += 1
+                                        else:
+                                            removal.append(note)
                                     else:
+                                        # If we've run out of notes in our list, mark this note for removal
                                         removal.append(note)
                     for r in removal:
                         measure.remove(r)
