@@ -42,14 +42,13 @@ squashfs-root/bin/mscore4portable "$@"' > /usr/local/bin/mscore && \
 RUN curl -fsSL https://bun.sh/install | bash 
 ENV PATH="/root/.bun/bin:${PATH}"
 
-# Copy requirements file
-COPY requirements.txt ./
+# Copy all backend directory contents (including subdirectories) to the app directory
+RUN mkdir -p /app
+WORKDIR /app
+COPY backend/. .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy source code
-COPY . .
 
 # Make setup script executable
 RUN chmod +x setup.js
@@ -58,4 +57,4 @@ RUN chmod +x setup.js
 EXPOSE 8000
 
 # Run setup script and then start the API server
-CMD bun setup.js && uvicorn api:app --host 0.0.0.0 --port 8000
+CMD bun setup.js && uvicorn app.main:app --host 0.0.0.0 --port 8000
