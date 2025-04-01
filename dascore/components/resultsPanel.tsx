@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, FileText, RefreshCw, Trash } from "lucide-react";
+import { Download, FileText, RefreshCw, Trash, Music } from "lucide-react";
 import { apiFetch, apiUrl } from "@/lib/apiUtils";
 import Link from "next/link";
 
@@ -14,6 +14,7 @@ interface ResultsPanelProps {
 interface AvailableFiles {
   musicxml: boolean;
   pdf: boolean;
+  wav?: boolean;
 }
 
 export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProps) {
@@ -22,6 +23,7 @@ export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProp
     pdf: false,
   });
   const [originalAudioUrl, setOriginalAudioUrl] = useState<string | null>(null);
+  const [synthesizedAudioUrl, setSynthesizedAudioUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,8 +41,10 @@ export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProp
           pdf: Boolean(data.pdf)
         });
 
-        // Set the audio URL
+        // Set the audio URLs
         setOriginalAudioUrl(apiUrl(`uploads/${fileId}`));
+        setSynthesizedAudioUrl(apiUrl(`audio/${fileId}`));
+        
         setIsLoading(false);
       } catch (error) {
         console.error("Error fetching file status:", error);
@@ -126,6 +130,21 @@ export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProp
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
+            {/* PDF Preview */}
+            {availableFiles.pdf && (
+              <div>
+                <h3 className="text-sm font-medium mb-2">Sheet Music Preview</h3>
+                <div className="aspect-[3/4] w-full bg-muted rounded-md overflow-hidden mb-4">
+                  <iframe
+                    src={apiUrl(`preview/${fileId}`)}
+                    className="w-full h-full border-0"
+                    title="Sheet Music Preview"
+                  />
+                </div>
+              </div>
+            )}
+            
+            {/* Original Audio */}
             {originalAudioUrl && (
               <div>
                 <h3 className="text-sm font-medium mb-2">Original Audio</h3>
@@ -137,9 +156,27 @@ export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProp
                 />
               </div>
             )}
-
+            
+            {/* Synthesized Audio */}
             <div>
-              <h3 className="text-sm font-medium mb-2">Sheet Music</h3>
+              <h3 className="text-sm font-medium flex items-center gap-2 mb-2">
+                <Music className="h-4 w-4" />
+                Synthesized Audio
+              </h3>
+              <audio
+                src={synthesizedAudioUrl}
+                controls
+                className="w-full"
+                title="Synthesized Audio"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Audio generated from the sheet music
+              </p>
+            </div>
+
+            {/* Download Options */}
+            <div>
+              <h3 className="text-sm font-medium mb-2">Download Options</h3>
               <div className="grid grid-cols-2 gap-3">
                 {availableFiles.musicxml && (
                   <Button
@@ -165,9 +202,10 @@ export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProp
               </div>
             </div>
 
+            {/* MusicXML Viewer */}
             {availableFiles.musicxml && (
               <div>
-                <h3 className="text-sm font-medium mb-2">Preview</h3>
+                <h3 className="text-sm font-medium mb-2">Interactive Viewer</h3>
                 <Link href={`/musicxml-viewer/${fileId}`} target="_blank">
                   <Button className="w-full" variant="outline">
                     Open MusicXML Viewer
@@ -196,16 +234,6 @@ export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProp
             </div>
           </div>
         </CardContent>
-        <CardFooter>
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={onReset}
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Start Over
-          </Button>
-        </CardFooter>
       </Card>
     </>
   );

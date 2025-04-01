@@ -50,42 +50,35 @@ export function ConversionPanel({ file, onConversionComplete }: ConversionPanelP
       formData.append("title", title);
 
       // Send the file to the API
-      const response = await apiFetch("convert", {
-        method: "POST",
-        body: formData,
-      });
-
-      // Clear the progress interval
-      clearInterval(progressInterval);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Conversion failed");
+      try {
+        const data = await apiFetch<ConversionResponse>("convert", {
+          method: "POST",
+          body: formData,
+        });
+        
+        // Set progress to 100% and notify success
+        setProgress(100);
+        
+        // Show appropriate toast message
+        if (!data.has_pdf) {
+          toast.warning("PDF generation failed, but MusicXML is available");
+        } else {
+          toast.success("Conversion successful!");
+        }
+        
+        // Call the completion handler
+        onConversionComplete(data.file_id);
+      } catch (error) {
+        console.error("Conversion error:", error);
+        setError(error instanceof Error ? error.message : "Conversion failed");
+        toast.error("Failed to convert audio");
+      } finally {
+        clearInterval(progressInterval);
+        setIsConverting(false);
       }
-
-      const data: ConversionResponse = await response.json();
-      
-      // Set progress to 100% and notify success
-      setProgress(100);
-      
-      // Show appropriate toast message
-      if (data.has_pdf) {
-        toast.success("Conversion completed successfully!");
-      } else {
-        toast.success(
-          "MusicXML generated successfully, but PDF generation failed. You can still download the MusicXML file.",
-          { duration: 5000 }
-        );
-      }
-      
-      // Notify parent component of completion
-      onConversionComplete(data.file_id);
     } catch (err) {
-      clearInterval(progressInterval);
       setError(err instanceof Error ? err.message : "An unknown error occurred");
       toast.error("Conversion failed. Please try again.");
-    } finally {
-      setIsConverting(false);
     }
   };
 
