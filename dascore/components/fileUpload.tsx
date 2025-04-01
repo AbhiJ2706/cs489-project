@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Music, Upload, AlertCircle, Youtube } from "lucide-react";
+import { Music, Upload, AlertCircle, Youtube, Music2, Link } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import dynamic from "next/dynamic";
 
@@ -19,22 +19,23 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
 interface FileUploadProps {
   onFileSelect: (file: File) => void;
-  onYoutubeUrlSubmit?: (url: string) => void;
+  onUrlSubmit?: (url: string) => void;
 }
 
-export function FileUpload({ onFileSelect, onYoutubeUrlSubmit }: FileUploadProps) {
+export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // YouTube related state
-  const [youtubeUrl, setYoutubeUrl] = useState<string>("");
-  const [isValidYoutubeUrl, setIsValidYoutubeUrl] = useState<boolean>(false);
-  const [isProcessingYoutube, setIsProcessingYoutube] = useState(false);
-  const [youtubeError, setYoutubeError] = useState<string | null>(null);
-
+  // URL related state
+  const [url, setUrl] = useState<string>("");
+  const [isValidUrl, setIsValidUrl] = useState<boolean>(false);
+  const [isProcessingUrl, setIsProcessingUrl] = useState(false);
+  const [urlError, setUrlError] = useState<string | null>(null);
+  const [urlType, setUrlType] = useState<"youtube" | "spotify" | null>(null);
+  
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     setError(null);
     const file = e.target.files?.[0];
@@ -81,40 +82,53 @@ export function FileUpload({ onFileSelect, onYoutubeUrlSubmit }: FileUploadProps
     fileInputRef.current?.click();
   };
 
-  const validateYoutubeUrl = (url: string) => {
-    // Updated regex for YouTube URLs to include music.youtube.com
+  // Detect URL type and validate it
+  const validateUrl = (inputUrl: string) => {
+    // YouTube URL validation
     const youtubeRegex = /^(https?:\/\/)?(www\.)?(music\.youtube\.com|youtube\.com|youtu\.be)\/.+$/;
-    return youtubeRegex.test(url);
+    if (youtubeRegex.test(inputUrl)) {
+      setUrlType("youtube");
+      return true;
+    }
+    
+    // Spotify URL validation
+    const spotifyRegex = /^(https?:\/\/)?(open\.spotify\.com\/track\/|spotify:track:)[a-zA-Z0-9]+(\?.*)?$/;
+    if (spotifyRegex.test(inputUrl)) {
+      setUrlType("spotify");
+      return true;
+    }
+    
+    setUrlType(null);
+    return false;
   };
 
-  const handleYoutubeUrlChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const url = e.target.value;
-    setYoutubeUrl(url);
-    setIsValidYoutubeUrl(validateYoutubeUrl(url));
-    setYoutubeError(null);
+  // Handle URL change
+  const handleUrlChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const inputUrl = e.target.value;
+    setUrl(inputUrl);
+    setIsValidUrl(validateUrl(inputUrl));
+    setUrlError(null);
   };
 
-  const handleYoutubeSubmit = async () => {
-    if (!isValidYoutubeUrl) {
-      setYoutubeError("Please enter a valid YouTube URL");
+  // Handle URL submit
+  const handleUrlSubmit = async () => {
+    if (!isValidUrl) {
+      setUrlError("Please enter a valid YouTube or Spotify URL");
       return;
     }
-
-    setIsProcessingYoutube(true);
-    setYoutubeError(null);
-
+    
+    setIsProcessingUrl(true);
+    setUrlError(null);
+    
     try {
-      // Normalize YouTube URL by converting music.youtube.com to youtube.com
-      const normalizedUrl = youtubeUrl.replace('music.youtube.com', 'youtube.com');
-      
-      if (onYoutubeUrlSubmit) {
-        onYoutubeUrlSubmit(normalizedUrl);
+      if (onUrlSubmit) {
+        onUrlSubmit(url);
       }
     } catch (error) {
-      setYoutubeError("Failed to process YouTube URL. Please try again.");
-      console.error("YouTube processing error:", error);
+      setUrlError("Failed to process URL. Please try again.");
+      console.error("URL processing error:", error);
     } finally {
-      // Don't set isProcessingYoutube to false here, since the caller will handle success/failure
+      // Don't set isProcessingUrl to false here, since the caller will handle success/failure
     }
   };
 
@@ -126,19 +140,19 @@ export function FileUpload({ onFileSelect, onYoutubeUrlSubmit }: FileUploadProps
           Upload Audio
         </CardTitle>
         <CardDescription>
-          Upload a WAV file or provide a YouTube URL
+          Upload a WAV file or provide a YouTube/Spotify URL
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="file" className="w-full">
+        <Tabs defaultValue="url" className="w-full">
           <TabsList className="grid grid-cols-2 mb-4">
             <TabsTrigger value="file" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
               File Upload
             </TabsTrigger>
-            <TabsTrigger value="youtube" className="flex items-center gap-2">
-              <Youtube className="h-4 w-4" />
-              YouTube
+            <TabsTrigger value="url" className="flex items-center gap-2">
+              <Link className="h-4 w-4" />
+              URL
             </TabsTrigger>
           </TabsList>
           
@@ -191,28 +205,45 @@ export function FileUpload({ onFileSelect, onYoutubeUrlSubmit }: FileUploadProps
             )}
           </TabsContent>
           
-          <TabsContent value="youtube" className="space-y-4">
+          <TabsContent value="url" className="space-y-4">
             <div className="space-y-4">
               <div>
-                <label htmlFor="youtube-url" className="text-sm font-medium block mb-1">YouTube URL</label>
+                <label htmlFor="url-input" className="text-sm font-medium block mb-1">YouTube or Spotify URL</label>
                 <Input
-                  id="youtube-url"
+                  id="url-input"
                   type="url"
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  value={youtubeUrl}
-                  onChange={handleYoutubeUrlChange}
+                  placeholder="Paste YouTube or Spotify track URL..."
+                  value={url}
+                  onChange={handleUrlChange}
                   className="w-full"
-                  disabled={isProcessingYoutube}
+                  disabled={isProcessingUrl}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Both youtube.com and music.youtube.com URLs are supported
+                  Supports YouTube and Spotify track URLs
                 </p>
+                
+                {/* Show appropriate service icon based on detected URL type */}
+                {urlType && (
+                  <div className="flex items-center gap-1 mt-1">
+                    <span className="text-xs text-muted-foreground">Detected: </span>
+                    {urlType === "youtube" ? (
+                      <div className="flex items-center gap-1 text-red-500">
+                        <Youtube className="h-3 w-3" /> <span className="text-xs">YouTube</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 text-green-500">
+                        <Music2 className="h-3 w-3" /> <span className="text-xs">Spotify</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               
-              {youtubeUrl && isValidYoutubeUrl && (
+              {/* Preview for YouTube URLs */}
+              {url && urlType === "youtube" && isValidUrl && (
                 <div className="rounded-md overflow-hidden aspect-video">
                   <ReactPlayer
-                    url={youtubeUrl}
+                    url={url}
                     width="100%"
                     height="100%"
                     controls={true}
@@ -221,20 +252,44 @@ export function FileUpload({ onFileSelect, onYoutubeUrlSubmit }: FileUploadProps
                 </div>
               )}
               
-              {youtubeError && (
+              {/* Preview for Spotify URLs */}
+              {url && urlType === "spotify" && isValidUrl && (
+                <div className="rounded-md overflow-hidden">
+                  {url.includes("spotify.com/track/") && (
+                    <iframe 
+                      src={`https://open.spotify.com/embed/track/${url.split("spotify.com/track/")[1].split("?")[0]}`}
+                      width="100%" 
+                      height="152" 
+                      frameBorder="0" 
+                      allow="encrypted-media"
+                    ></iframe>
+                  )}
+                  {url.includes("spotify:track:") && (
+                    <iframe 
+                      src={`https://open.spotify.com/embed/track/${url.split("spotify:track:")[1].split("?")[0]}`}
+                      width="100%" 
+                      height="152" 
+                      frameBorder="0" 
+                      allow="encrypted-media"
+                    ></iframe>
+                  )}
+                </div>
+              )}
+              
+              {urlError && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Error</AlertTitle>
-                  <AlertDescription>{youtubeError}</AlertDescription>
+                  <AlertDescription>{urlError}</AlertDescription>
                 </Alert>
               )}
               
               <Button 
-                onClick={handleYoutubeSubmit} 
+                onClick={handleUrlSubmit} 
                 className="w-full"
-                disabled={!isValidYoutubeUrl || isProcessingYoutube}
+                disabled={!isValidUrl || isProcessingUrl}
               >
-                {isProcessingYoutube ? "Processing..." : "Convert to Sheet Music"}
+                {isProcessingUrl ? "Processing..." : "Convert to Sheet Music"}
               </Button>
             </div>
           </TabsContent>

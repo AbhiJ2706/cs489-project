@@ -6,8 +6,8 @@ import { AudioPlayer } from "@/components/audioPlayer";
 import { ConversionPanel } from "@/components/conversionPanel";
 import { ResultsPanel } from "@/components/resultsPanel";
 import { Toaster } from "@/components/ui/sonner";
-import { Music, RefreshCw, Youtube } from "lucide-react";
-import { apiFetch } from "@/lib/apiUtils";
+import { Music, RefreshCw, Youtube, Music2 } from "lucide-react";
+import { apiFetch, getApiBaseUrl } from "@/lib/apiUtils";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,20 +17,23 @@ import dynamic from "next/dynamic";
 // Import ReactPlayer dynamically to avoid SSR issues
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
-// Define the API response type for file conversion
-interface ConversionResponse {
-  file_id: string;
-  message: string;
-  has_pdf: boolean;
-}
-
 export default function Home() {
+  // File upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [convertedFileId, setConvertedFileId] = useState<string | null>(null);
-  const [step, setStep] = useState<"upload" | "convert" | "results" | "processing-youtube">("upload");
-  const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null);
+  
+  // YouTube URL state
+  const [youtubeUrl, setYoutubeUrl] = useState<string>("");
   const [isProcessingYoutube, setIsProcessingYoutube] = useState(false);
-  const [isValidYoutubeUrl, setIsValidYoutubeUrl] = useState<boolean>(false);
+  
+  // Spotify URL state
+  const [spotifyUrl, setSpotifyUrl] = useState<string>("");
+  const [isProcessingSpotify, setIsProcessingSpotify] = useState(false);
+
+  // UI state
+  const [step, setStep] = useState<
+    "upload" | "processing-file" | "processing-youtube" | "processing-spotify" | "results"
+  >("upload");
   
   // Use a single YouTube player ref to maintain state
   const youtubePlayerRef = useRef<any>(null);
@@ -49,65 +52,87 @@ export default function Home() {
     };
   }, [convertedFileId]);
 
-  // Validate YouTube URL
+  // Helper for YouTube URL validation
   const validateYoutubeUrl = (url: string) => {
-    // Updated regex for YouTube URLs to include music.youtube.com
-    const youtubeRegex = /^(https?:\/\/)?(www\.)?(music\.youtube\.com|youtube\.com|youtu\.be)\/.+$/;
-    return youtubeRegex.test(url);
+    const regex = /^(https?:\/\/)?(www\.)?(music\.youtube\.com|youtube\.com|youtu\.be)\/.+$/;
+    return regex.test(url);
   };
 
-  // Handle YouTube URL change
-  const handleYoutubeUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const url = e.target.value;
-    setYoutubeUrl(url);
-    setIsValidYoutubeUrl(validateYoutubeUrl(url));
+  // Helper for Spotify URL validation
+  const validateSpotifyUrl = (url: string) => {
+    const spotifyRegex = /^(https?:\/\/)?(open\.spotify\.com\/track\/|spotify:track:)[a-zA-Z0-9]+(\?.*)?$/;
+    return spotifyRegex.test(url);
   };
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
-    setYoutubeUrl(null);
-    setStep("convert");
+    setYoutubeUrl("");
+    setSpotifyUrl("");
+    setStep("processing-file");
     setConvertedFileId(null);
   };
 
-  const handleYoutubeSubmit = async (url: string) => {
-    if (!url || !validateYoutubeUrl(url)) {
-      toast.error("Please enter a valid YouTube URL");
+  // Function to handle URL submission (YouTube or Spotify)
+  const handleUrlSubmit = async (url: string) => {
+    // Detect URL type for UI feedback (processing state)
+    const isYoutubeUrl = url.includes("youtube.com") || url.includes("youtu.be");
+    const isSpotifyUrl = url.includes("spotify.com/track/") || url.includes("spotify:track:");
+    
+    if (!url || (!isYoutubeUrl && !isSpotifyUrl)) {
+      toast.error("Please enter a valid YouTube or Spotify URL");
       return;
     }
     
-    setIsProcessingYoutube(true);
-    setYoutubeUrl(url);
+    // Set the appropriate processing state based on URL type
+    if (isYoutubeUrl) {
+      setIsProcessingYoutube(true);
+      setYoutubeUrl(url);
+      setStep("processing-youtube");
+    } else {
+      setIsProcessingSpotify(true);
+      setSpotifyUrl(url);
+      setStep("processing-spotify");
+    }
+    
     setSelectedFile(null);
-    setStep("processing-youtube");
     
     try {
-      // Normalize YouTube URL by converting music.youtube.com to youtube.com
-      const normalizedUrl = url.replace('music.youtube.com', 'youtube.com');
+      console.log("Processing URL:", url);
       
-      // Call the YouTube API endpoint
-      const response = await apiFetch<ConversionResponse>('convert-youtube', {
+      // Call the unified URL API endpoint
+      const response = await fetch(`${getApiBaseUrl()}/convert-url`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url: normalizedUrl }),
+        body: JSON.stringify({ url }),
       });
       
-      if (response && response.file_id) {
-        toast.success("YouTube audio processed successfully!");
-        setConvertedFileId(response.file_id);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API error:", response.status, errorText);
+        throw new Error(`API error: ${response.status} - ${errorText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data && data.file_id) {
+        toast.success("Audio processed successfully!");
+        setConvertedFileId(data.file_id);
         setStep("results");
       } else {
-        toast.error("Failed to process YouTube URL");
+        console.error("Invalid API response:", data);
+        toast.error("Failed to process URL: Invalid response");
         setStep("upload");
       }
     } catch (error) {
-      console.error("YouTube processing error:", error);
-      toast.error("Failed to process YouTube URL. Please try another video.");
+      console.error("URL processing error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to process URL");
       setStep("upload");
     } finally {
+      // Reset processing states
       setIsProcessingYoutube(false);
+      setIsProcessingSpotify(false);
     }
   };
 
@@ -127,9 +152,10 @@ export default function Home() {
     }
     
     setSelectedFile(null);
-    setYoutubeUrl(null);
-    setConvertedFileId(null);
+    setYoutubeUrl("");
+    setSpotifyUrl("");
     setIsProcessingYoutube(false);
+    setIsProcessingSpotify(false);
     setStep("upload");
   };
 
@@ -161,8 +187,11 @@ export default function Home() {
             <div className="flex flex-col">
               <Input
                 type="url"
-                value={youtubeUrl || ""}
-                onChange={handleYoutubeUrlChange}
+                value={youtubeUrl}
+                onChange={(e) => {
+                  const url = e.target.value;
+                  setYoutubeUrl(url);
+                }}
                 className="mb-2"
                 placeholder="Enter YouTube URL"
                 disabled={isProcessingYoutube}
@@ -177,8 +206,8 @@ export default function Home() {
                 </div>
               ) : (
                 <Button
-                  onClick={() => handleYoutubeSubmit(youtubeUrl || "")}
-                  disabled={!youtubeUrl || !isValidYoutubeUrl || isProcessingYoutube}
+                  onClick={() => handleUrlSubmit(youtubeUrl)}
+                  disabled={!youtubeUrl || !validateYoutubeUrl(youtubeUrl) || isProcessingYoutube}
                   className="w-full"
                 >
                   {isProcessingYoutube ? "Processing..." : 
@@ -192,39 +221,94 @@ export default function Home() {
     );
   };
 
+  // Render Spotify player and related content
+  const renderSpotifySection = () => {
+    if (!spotifyUrl) return null;
+    
+    // Extract Spotify track ID for embedding
+    let trackId = "";
+    if (spotifyUrl.includes("spotify.com/track/")) {
+      trackId = spotifyUrl.split("spotify.com/track/")[1].split("?")[0];
+    } else if (spotifyUrl.includes("spotify:track:")) {
+      trackId = spotifyUrl.split("spotify:track:")[1].split("?")[0];
+    }
+    
+    return (
+      <Card className="w-full max-w-md mx-auto mb-4">
+        <CardContent className="pt-6 pb-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Music2 className="h-5 w-5" />
+              {step === "processing-spotify" ? "Processing Spotify Track" : "Spotify Source"}
+            </h3>
+            
+            {trackId && (
+              <div className="rounded-md overflow-hidden aspect-video">
+                <iframe 
+                  src={`https://open.spotify.com/embed/track/${trackId}`}
+                  width="100%" 
+                  height="152" 
+                  frameBorder="0" 
+                  allow="encrypted-media"
+                ></iframe>
+              </div>
+            )}
+            
+            {step === "processing-spotify" ? (
+              <div className="flex items-center justify-center py-4">
+                <RefreshCw className="h-5 w-5 animate-spin text-primary mr-2" />
+                <p className="text-sm">
+                  Processing... Please wait while we download and convert the audio.
+                </p>
+              </div>
+            ) : (
+              <Button
+                onClick={() => handleUrlSubmit(spotifyUrl)}
+                disabled={!spotifyUrl || !validateSpotifyUrl(spotifyUrl) || isProcessingSpotify}
+                className="w-full"
+              >
+                {isProcessingSpotify ? "Processing..." : 
+                  step === "results" ? "Try Another Spotify Track" : "Convert to Sheet Music"}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
-      <div className="container mx-auto px-4 py-12">
-        <header className="text-center mb-12">
+      <div className="container mx-auto px-4 py-6 sm:py-12">
+        <header className="text-center mb-6 sm:mb-12">
           <div className="inline-flex items-center justify-center p-2 bg-primary/10 rounded-full mb-4">
-            <Music className="h-8 w-8 text-primary" />
+            <Music className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">
             DaScore
           </h1>
-          <p className="text-muted-foreground max-w-md mx-auto">
+          <p className="text-sm sm:text-base text-muted-foreground max-w-md mx-auto">
             Upload your WAV audio files or YouTube videos and convert them to sheet music with just a click
           </p>
         </header>
 
-        <main className="max-w-md mx-auto space-y-4">
+        <main className="max-w-full sm:max-w-md mx-auto space-y-4">
           {/* Step: Upload */}
           {step === "upload" && (
             <FileUpload 
               onFileSelect={handleFileSelect} 
-              onYoutubeUrlSubmit={(url) => {
-                setYoutubeUrl(url);
-                setIsValidYoutubeUrl(validateYoutubeUrl(url));
-                handleYoutubeSubmit(url);
-              }} 
+              onUrlSubmit={handleUrlSubmit}
             />
           )}
           
           {/* YouTube section - always rendered when there's a YouTube URL */}
           {youtubeUrl && renderYoutubeSection()}
           
+          {/* Spotify section - always rendered when there's a Spotify URL */}
+          {spotifyUrl && renderSpotifySection()}
+          
           {/* Step: Convert (WAV file) */}
-          {selectedFile && step === "convert" && (
+          {selectedFile && step === "processing-file" && (
             <>
               <AudioPlayer file={selectedFile} />
               <ConversionPanel 

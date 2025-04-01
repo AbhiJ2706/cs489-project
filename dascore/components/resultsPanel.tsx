@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, FileText, RefreshCw, Trash, Music } from "lucide-react";
+import { Download, FileText, RefreshCw, Trash } from "lucide-react";
 import { apiFetch, apiUrl } from "@/lib/apiUtils";
 import Link from "next/link";
 
@@ -85,9 +85,9 @@ export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProp
 
   if (isLoading) {
     return (
-      <Card className="w-full max-w-md mx-auto mt-6">
+      <Card className="w-full max-w-full sm:max-w-md mx-auto mt-4 sm:mt-6">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
             <RefreshCw className="h-5 w-5 animate-spin" />
             Loading Results
           </CardTitle>
@@ -105,7 +105,7 @@ export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProp
 
   if (error) {
     return (
-      <Card className="w-full max-w-md mx-auto mt-6">
+      <Card className="w-full max-w-full sm:max-w-md mx-auto mt-4 sm:mt-6">
         <CardHeader>
           <CardTitle className="text-red-500">Error</CardTitle>
         </CardHeader>
@@ -121,20 +121,20 @@ export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProp
 
   return (
     <>
-      <Card className="w-full max-w-md mx-auto mt-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Card className="w-full max-w-full sm:max-w-md mx-auto mt-4 sm:mt-6">
+        <CardHeader className="pb-2 sm:pb-6">
+          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
             <FileText className="h-5 w-5" />
             Conversion Results
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* PDF Preview */}
             {availableFiles.pdf && (
               <div>
                 <h3 className="text-sm font-medium mb-2">Sheet Music Preview</h3>
-                <div className="aspect-[3/4] w-full bg-muted rounded-md overflow-hidden mb-4">
+                <div className="aspect-[3/4] w-full bg-muted rounded-md overflow-hidden mb-2 sm:mb-4">
                   <iframe
                     src={apiUrl(`preview/${fileId}`)}
                     className="w-full h-full border-0"
@@ -147,11 +147,11 @@ export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProp
             {/* Original Audio */}
             {originalAudioUrl && (
               <div>
-                <h3 className="text-sm font-medium mb-2">Original Audio</h3>
+                <h3 className="text-sm font-medium mb-1 sm:mb-2">Original Audio</h3>
                 <audio
                   src={originalAudioUrl}
                   controls
-                  className="w-full"
+                  className="w-full max-w-full"
                   title={originalFile?.name || "Original Audio.wav"}
                 />
               </div>
@@ -159,46 +159,40 @@ export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProp
             
             {/* Synthesized Audio */}
             <div>
-              <h3 className="text-sm font-medium flex items-center gap-2 mb-2">
-                <Music className="h-4 w-4" />
-                Synthesized Audio
-              </h3>
+              <h3 className="text-sm font-medium mb-1 sm:mb-2">Synthesized Audio</h3>
               <audio
-                src={synthesizedAudioUrl}
+                src={synthesizedAudioUrl || undefined}
                 controls
-                className="w-full"
-                title="Synthesized Audio"
+                className="w-full max-w-full"
+                title="Synthesized Sheet Music"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Audio generated from the sheet music
+                This is how your sheet music sounds when played by a computer
               </p>
             </div>
 
-            {/* Download Options */}
-            <div>
+            {/* Download Buttons */}
+            <div className="pt-2 sm:pt-4">
               <h3 className="text-sm font-medium mb-2">Download Options</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {availableFiles.musicxml && (
-                  <Button
-                    variant="outline"
-                    onClick={() => handleDownload("musicxml")}
-                    className="flex items-center gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    MusicXML
-                  </Button>
-                )}
-
-                {availableFiles.pdf && (
-                  <Button
-                    variant="outline"
-                    onClick={() => handleDownload("pdf")}
-                    className="flex items-center gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    PDF
-                  </Button>
-                )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
+                <Button 
+                  onClick={() => handleDownload("musicxml")} 
+                  disabled={!availableFiles.musicxml}
+                  className="flex items-center justify-center gap-2"
+                  variant="outline"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>MusicXML</span>
+                </Button>
+                
+                <Button 
+                  onClick={() => handleDownload("pdf")} 
+                  disabled={!availableFiles.pdf}
+                  className="flex items-center justify-center gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>PDF</span>
+                </Button>
               </div>
             </div>
 

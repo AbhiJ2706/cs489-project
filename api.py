@@ -3,21 +3,27 @@ FastAPI backend for WAV to Sheet Music conversion.
 """
 
 import os
+import sys
+import time
 import tempfile
 import shutil
 import subprocess
+from typing import Optional, Dict, List, Union
 from pathlib import Path
-from typing import List, Optional
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
-from fastapi.responses import FileResponse, Response
-from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
+import ffmpeg
+import yt_dlp
+from music21 import environment
 from pydantic import BaseModel
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Form, Query
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse, Response
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.background import BackgroundTask
 from wav_to_sheet_music import wav_to_sheet_music
 from musicxml_to_wav import musicxml_to_wav
 import music21
 import yt_dlp
 import ffmpeg
+import uvicorn
 
 # Create temporary directory for storing files
 TEMP_DIR = Path(tempfile.gettempdir()) / "audio_converter"
@@ -69,6 +75,8 @@ async def home():
         "endpoints": {
             "POST /convert": "Convert WAV file to sheet music",
             "POST /convert-youtube": "Convert YouTube video audio to sheet music",
+            "POST /convert-spotify": "Convert Spotify track audio to sheet music",
+            "POST /convert-url": "Auto-detect URL type (YouTube or Spotify) and process accordingly",
             "GET /download/{file_type}/{file_id}": "Download a converted file",
             "GET /preview/{file_id}": "Preview PDF file",
             "GET /musicxml-content/{file_id}": "Get MusicXML content",
@@ -89,6 +97,16 @@ class ConversionResult(BaseModel):
 
 class YouTubeUrl(BaseModel):
     """Model for YouTube URL input."""
+    url: str
+    title: Optional[str] = None
+
+class SpotifyUrl(BaseModel):
+    """Model for Spotify URL input."""
+    url: str
+    title: Optional[str] = None
+
+class GenericUrl(BaseModel):
+    """Model for generic URL input (YouTube or Spotify)."""
     url: str
     title: Optional[str] = None
 
@@ -322,6 +340,199 @@ async def convert_youtube(youtube_data: YouTubeUrl):
             detail=f"YouTube conversion failed: {str(e)}"
         )
 
+@app.post("/convert-spotify", response_model=ConversionResult)
+async def convert_spotify(spotify_data: SpotifyUrl):
+    """
+    Download audio from a Spotify URL, convert to WAV, and generate sheet music.
+    
+    Args:
+        spotify_data: The Spotify URL to process
+        
+    Returns:
+        ConversionResult: File ID and status message
+    """
+    url = spotify_data.url
+    title = spotify_data.title
+    
+    # Create unique file ID and paths
+    file_id = f"{os.urandom(4).hex()}"
+    temp_dir = TEMP_DIR / file_id
+    temp_dir.mkdir(exist_ok=True)
+    
+    wav_path = TEMP_DIR / f"{file_id}.wav"
+    musicxml_path = TEMP_DIR / f"{file_id}.musicxml"
+    pdf_path = TEMP_DIR / f"{file_id}.pdf"
+    
+    try:
+        # Extract the Spotify track ID from the URL
+        # URL format: https://open.spotify.com/track/1234567890
+        if "spotify.com/track/" in url:
+            track_id = url.split("spotify.com/track/")[1].split("?")[0]
+        elif "spotify:track:" in url:
+            track_id = url.split("spotify:track:")[1].split("?")[0]
+        else:
+            raise HTTPException(status_code=400, detail="Invalid Spotify URL. Please provide a link to a specific track.")
+
+        # Check if spotdl is installed
+        try:
+            # Check if spotdl is installed by running a simple command
+            subprocess.run(['spotdl', '--version'], check=True, capture_output=True)
+        except (subprocess.SubprocessError, FileNotFoundError):
+            # If spotdl is not installed or there's an error
+            raise HTTPException(
+                status_code=500,
+                detail="The spotdl tool is not installed or not working properly. Please install it with 'pip install spotdl'."
+            )
+            
+        # Use spotdl to download the track
+        print(f"Attempting to download Spotify track: {track_id}")
+        download_output_path = str(temp_dir)
+        
+        try:
+            # Run spotdl command to download the track
+            subprocess.run([
+                'spotdl', 'download', f"https://open.spotify.com/track/{track_id}", 
+                '--output', download_output_path
+            ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            # Find the downloaded file (should be the only file in the temp directory)
+            downloaded_files = list(temp_dir.glob('*.*'))
+            if not downloaded_files:
+                raise Exception("spotdl did not download any files")
+            
+            downloaded_file = downloaded_files[0]
+            print(f"Downloaded file: {downloaded_file}")
+            
+            # If title wasn't provided, use the track title
+            if not title:
+                title = downloaded_file.stem
+            
+            # Convert to WAV using ffmpeg
+            try:
+                ffmpeg.input(str(downloaded_file)).output(
+                    str(wav_path), 
+                    ar=44100,  # Audio sample rate
+                    ac=2,      # Stereo audio
+                    acodec='pcm_s16le'  # 16-bit PCM encoding for WAV
+                ).overwrite_output().run(quiet=True, capture_stdout=True, capture_stderr=True)
+                
+                print(f"Converted {downloaded_file} to WAV: {wav_path}")
+                
+            except ffmpeg.Error as e:
+                # If the ffmpeg-python library fails, fall back to subprocess
+                print(f"ffmpeg.Error: {str(e)}, falling back to subprocess")
+                subprocess.run([
+                    'ffmpeg', '-i', str(downloaded_file), 
+                    '-ar', '44100', '-ac', '2', 
+                    '-acodec', 'pcm_s16le', str(wav_path),
+                    '-y', '-loglevel', 'error'
+                ], check=True)
+            
+            # Clean up downloaded file
+            if downloaded_file.exists():
+                downloaded_file.unlink()
+                
+        except subprocess.CalledProcessError as e:
+            print(f"Error running spotdl: {e.stderr.decode() if e.stderr else str(e)}")
+            raise Exception(f"Failed to download Spotify track: {str(e)}")
+        
+        # Convert WAV to sheet music
+        success = wav_to_sheet_music(
+            str(wav_path),
+            str(musicxml_path),
+            title=title,
+            output_pdf=str(pdf_path)
+        )
+        
+        # Check if conversion was successful for MusicXML
+        if not success or not musicxml_path.exists():
+            raise HTTPException(
+                status_code=500, 
+                detail="Conversion failed. Please try a different Spotify track."
+            )
+        
+        # Check if PDF was generated
+        has_pdf = pdf_path.exists()
+        
+        # Synthesize audio from the MusicXML
+        synthesized_wav_path = TEMP_DIR / f"{file_id}_synthesized.wav"
+        try:
+            print(f"Attempting to synthesize audio for {file_id}")
+            print(f"MusicXML path: {musicxml_path} (exists: {musicxml_path.exists()})")
+            print(f"Output path: {synthesized_wav_path}")
+            print(f"Using soundfont: {SOUNDFONT_PATH}")
+            
+            success = musicxml_to_wav(
+                str(musicxml_path), 
+                str(synthesized_wav_path),
+                soundfont_path=str(SOUNDFONT_PATH)
+            )
+            
+            if success:
+                print(f"Audio synthesis successful, file saved to {synthesized_wav_path}")
+                print(f"Synthesized file exists: {synthesized_wav_path.exists()}")
+                print(f"Synthesized file size: {synthesized_wav_path.stat().st_size if synthesized_wav_path.exists() else 0} bytes")
+            else:
+                print("Warning: Failed to synthesize audio from MusicXML")
+        except Exception as e:
+            print(f"Error synthesizing audio: {str(e)}")
+            import traceback
+            traceback.print_exc()
+        
+        # If PDF generation failed but MusicXML succeeded, we can still return success
+        message = "Spotify audio conversion successful"
+        if not has_pdf:
+            message += " (PDF generation failed, but MusicXML is available)"
+        
+        return ConversionResult(
+            file_id=file_id,
+            message=message,
+            has_pdf=has_pdf
+        )
+    
+    except Exception as e:
+        # Clean up any created files
+        for path in [wav_path, musicxml_path, pdf_path]:
+            if path.exists():
+                path.unlink()
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
+        
+        raise HTTPException(
+            status_code=500,
+            detail=f"Spotify conversion failed: {str(e)}"
+        )
+
+@app.post("/convert-url", response_model=ConversionResult)
+async def convert_url(url_data: GenericUrl):
+    """
+    Auto-detect URL type (YouTube or Spotify) and process accordingly.
+    
+    Args:
+        url_data: The URL to process and optional title
+        
+    Returns:
+        ConversionResult: File ID and status message
+    """
+    url = url_data.url
+    title = url_data.title
+    
+    # Auto-detect URL type
+    if "youtube.com" in url or "youtu.be" in url or "music.youtube.com" in url:
+        # Handle as YouTube URL
+        youtube_data = YouTubeUrl(url=url, title=title)
+        return await convert_youtube(youtube_data)
+    elif "spotify.com/track/" in url or "spotify:track:" in url:
+        # Handle as Spotify URL
+        spotify_data = SpotifyUrl(url=url, title=title)
+        return await convert_spotify(spotify_data)
+    else:
+        # Unknown URL type
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported URL format. Please provide a valid YouTube or Spotify URL."
+        )
+
 @app.get("/download/{file_type}/{file_id}")
 async def download_file(file_type: str, file_id: str):
     """
@@ -404,41 +615,47 @@ async def get_musicxml_content(file_id: str):
     return Response(content=content, media_type="text/xml")
 
 @app.get("/synthesize/{file_id}")
-async def synthesize_audio(file_id: str, background_tasks: BackgroundTasks):
+async def synthesize_audio(file_id: str):
     """
-    Convert MusicXML to WAV audio for playback.
+    Synthesize audio from MusicXML to WAV.
     
     Args:
-        file_id: ID of the MusicXML file to convert
+        file_id: ID of the MusicXML file
         
     Returns:
-        dict: Status and audio URL for the frontend
+        dict: Status message
     """
     musicxml_path = TEMP_DIR / f"{file_id}.musicxml"
     wav_path = TEMP_DIR / f"{file_id}_synthesized.wav"
     
+    # Check if MusicXML file exists
     if not musicxml_path.exists():
         raise HTTPException(status_code=404, detail="MusicXML file not found")
     
-    # Check if synthesized audio already exists
-    if not wav_path.exists():
+    # If synthesized audio already exists, don't regenerate it
+    if wav_path.exists():
+        return {"status": "success", "message": "Audio already synthesized"}
+    
+    try:
         # Convert MusicXML to WAV
         success = musicxml_to_wav(
             str(musicxml_path), 
             str(wav_path),
-            soundfont_path=str(SOUNDFONT_PATH)  # Pass the absolute path to the soundfont
+            soundfont_path=str(SOUNDFONT_PATH)
         )
         
         if not success:
             raise HTTPException(
-                status_code=500,
+                status_code=500, 
                 detail="Failed to synthesize audio from MusicXML"
             )
-    
-    return {
-        "status": "success",
-        "audio_url": f"/audio/{file_id}"
-    }
+        
+        return {"status": "success", "message": "Audio synthesis complete"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error synthesizing audio: {str(e)}"
+        )
 
 @app.get("/audio/{file_id}")
 async def get_audio(file_id: str):
