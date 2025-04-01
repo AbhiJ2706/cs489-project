@@ -11,6 +11,7 @@ import { apiFetch, apiUrl } from "../lib/apiUtils";
 
 interface ResultsPanelProps {
   fileId: string | null;
+  originalFile?: File | null;
   onReset: () => void;
 }
 
@@ -19,7 +20,7 @@ interface AvailableFiles {
   pdf: boolean;
 }
 
-export function ResultsPanel({ fileId, onReset }: ResultsPanelProps) {
+export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProps) {
   const [availableFiles, setAvailableFiles] = useState<AvailableFiles>({
     musicxml: false,
     pdf: false
@@ -186,7 +187,9 @@ export function ResultsPanel({ fileId, onReset }: ResultsPanelProps) {
                     <div className="text-center font-medium mb-2">
                       Original Audio
                     </div>
-                    {originalAudioUrl ? (
+                    {originalFile ? (
+                      <AudioPlayer file={originalFile} />
+                    ) : originalAudioUrl ? (
                       <audio 
                         controls 
                         src={originalAudioUrl} 

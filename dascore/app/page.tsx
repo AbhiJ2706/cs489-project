@@ -87,6 +87,7 @@ export default function Home() {
           {step === "results" && convertedFileId && (
             <ResultsPanel 
               fileId={convertedFileId} 
+              originalFile={selectedFile} 
               onReset={handleReset} 
             />
           )}
