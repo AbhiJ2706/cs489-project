@@ -11,8 +11,6 @@ from music21 import (clef, duration, instrument, metadata,
 from .utils import setup_musescore_path
 from music21 import environment
 import numpy as np
-environment.set(
-    'musicxmlPath', '/Applications/MuseScore 4.app/Contents/MacOS/mscore')
 
 # Initialize MuseScore path
 setup_musescore_path()
