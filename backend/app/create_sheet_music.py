@@ -34,7 +34,7 @@ MIDI_MAX = librosa.note_to_midi('C8')
 
 ONSET_STRENGTH_THRESHOLD = 0.85
 SILENCE_THRESHOLD = 0.007
-REST_GAP_THRESHOLD = 0.375
+REST_GAP_THRESHOLD = 0.25
 NOTE_NOISE_FLOOR_MULTIPLIER = 2
 
 TIME_TO_REST = {
@@ -133,7 +133,7 @@ def combine_rests_in_measure(measure):
             new_measure.append(locations[time])
             time += locations[time].quarterLength
         if not any(elem):
-            combined_rest = note.Rest(quarterLength=0.25 * len(elem))
+            combined_rest = note.Rest(TIME_TO_REST[0.25 * len(elem)])
             new_measure.append(combined_rest)
             time += 0.25 * len(elem)
 
@@ -215,9 +215,8 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
 
         current_end_time = -1
         gap = __convert_to_time(time_points[0] / (1 / (tp / 4) * 15))
-        r = note.Rest(__closest(gap))
-        treble_part.append(r)
-        bass_part.append(r)
+        treble_part.append(note.Rest(TIME_TO_REST[gap]))
+        bass_part.append(note.Rest(TIME_TO_REST[gap]))
 
         for time_point in time_points:
             notes_at_time = notes_by_time[time_point]
@@ -231,11 +230,13 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
                     if current_end_time == -1:
                         current_end_time = note_obj.end
                     else:
-                        gap = __convert_to_time((note_obj.start - current_end_time) / (1 / (tp / 4) * 15))
-                        if gap >= REST_GAP_THRESHOLD:
-                            r = note.Rest(__closest(gap))
-                            treble_part.append(r)
-                            bass_part.append(r)
+                        start_rest_time = note_obj.start - current_end_time
+                        if start_rest_time / (1 / (tp / 4) * 15) >= REST_GAP_THRESHOLD:
+                            while start_rest_time > 0:
+                                gap = __convert_to_time(start_rest_time / (1 / (tp / 4) * 15))
+                                treble_part.append(note.Rest(TIME_TO_REST[gap]))
+                                bass_part.append(note.Rest(TIME_TO_REST[gap]))
+                                start_rest_time -= (gap * (1 / (tp / 4) * 15))
                         current_end_time = note_obj.end
 
                     if note_duration <= 0.25:
@@ -292,12 +293,12 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None):
                 part.append(m)
 
         score.write(fmt='musicxml', fp=output_xml, makeNotation=True)
+        print(f"MusicXML file saved as: {output_xml}")
         score.write('midi', fp=output_xml.replace("xml", "mid"))
         xml_data = converter.parse(output_xml)
         score = combine_rests_in_score(xml_data)
         score.write(fmt='musicxml', fp=output_xml)
-
-        print(f"MusicXML file saved as: {output_xml}")
+        print(f"MusicXML file edited as: {output_xml}")
 
         if output_pdf:
             try:
