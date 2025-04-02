@@ -14,7 +14,7 @@ from app.routers.auth import get_current_user, get_optional_user
 
 router = APIRouter(prefix="/scores", tags=["scores"])
 
-@router.post("/", response_model=ScoreGenerationRead)
+@router.post("", response_model=ScoreGenerationRead)
 async def create_score_generation(
     score: ScoreGenerationCreate,
     current_user: Optional[User] = Depends(get_optional_user),
