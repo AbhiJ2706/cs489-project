@@ -109,16 +109,25 @@ export class ConversionService {
 	 */
 	public static convertAudioConvertPost(data: ConversionData['ConvertAudioConvertPost']): CancelablePromise<ConversionResult> {
 		const {
-formData,
-title,
-} = data;
+			formData,
+			title,
+		} = data;
+		
+		// Create a plain object with file and optional title
+		// The client library will convert this to FormData internally
+		const formDataObj: Record<string, unknown> = {
+			file: formData.file
+		};
+		
+		// Add title if provided
+		if (title) {
+			formDataObj.title = title;
+		}
+		
 		return __request(OpenAPI, {
 			method: 'POST',
 			url: '/convert',
-			query: {
-				title
-			},
-			formData: formData,
+			formData: formDataObj,
 			mediaType: 'multipart/form-data',
 			errors: {
 				422: `Validation Error`,
