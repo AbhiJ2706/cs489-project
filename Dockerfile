@@ -25,18 +25,18 @@ RUN apt-get update && apt-get install -y \
     libopengl0 \
     && rm -rf /var/lib/apt/lists/*
 
-
 # Install Bun
 RUN curl -fsSL https://bun.sh/install | bash 
 ENV PATH="/root/.bun/bin:${PATH}"
 
-# Copy all backend directory contents (including subdirectories) to the app directory
-RUN mkdir -p /app
-WORKDIR /app
-COPY backend/. .
+# Create app directory and copy backend
+RUN mkdir -p /app/backend
+WORKDIR /app/backend
+COPY backend/ .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+
 # Install MuseScore using AppImage extraction
 RUN wget -q -O musescore.appimage https://cdn.jsdelivr.net/musescore/v4.4.1/MuseScore-Studio-4.4.1.242490810-x86_64.AppImage && \
     chmod +x musescore.appimage && \

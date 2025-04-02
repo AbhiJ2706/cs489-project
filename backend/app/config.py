@@ -10,7 +10,7 @@ TEMP_DIR = Path(tempfile.gettempdir()) / "audio_converter"
 TEMP_DIR.mkdir(exist_ok=True)
 
 # Get the absolute path to the project root directory
-PROJECT_ROOT = Path(__file__).parent.absolute()
+PROJECT_ROOT = Path(__file__).parent.parent.absolute()  # Go up one level to the backend directory
 SOUNDFONT_PATH = PROJECT_ROOT / "FluidR3_GM.sf2"
 
 # Output debugging information about soundfont
