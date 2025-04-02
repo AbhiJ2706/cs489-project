@@ -6,10 +6,11 @@ import pretty_midi
 from pedalboard import Compressor, Gain, LowShelfFilter, NoiseGate, Pedalboard
 from scipy.signal import butter, filtfilt
 
-from music21 import environment
-environment.set(
-    'musicxmlPath', '/Applications/MuseScore 4.app/Contents/MacOS/mscore')
+from music21 import environment, meter, note, stream, chord
+from .utils import setup_musescore_path
 
+# Initialize MuseScore path
+setup_musescore_path()
 
 LOW_FREQUENCY = 25
 HIGH_FREQEUNCY = 4200

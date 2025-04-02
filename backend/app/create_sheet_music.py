@@ -1,16 +1,21 @@
 import os
 import subprocess
 import xml.etree.ElementTree as ET
+import logging
 
 import librosa
 import librosa.display
 from music21 import (clef, duration, instrument, metadata,
                      meter, note, stream, tempo, tie)
 
-from music21 import environment
-environment.set(
-    'musicxmlPath', '/Applications/MuseScore 4.app/Contents/MacOS/mscore')
+from .utils import setup_musescore_path
 
+# Initialize MuseScore path
+setup_musescore_path()
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 LOW_FREQUENCY = 25
 HIGH_FREQEUNCY = 4200

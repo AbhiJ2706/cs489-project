@@ -7,42 +7,18 @@ import warnings
 import librosa
 import librosa.display
 
-from music21 import environment
-
+from .utils import setup_musescore_path
 from .create_sheet_music import generate_sheet_music, midi_to_musicxml
 from .load_audio import load_audio_with_fallback
 from .process_audio import detect_notes_and_chords, preprocess_audio
 from .visualize import visualize_audio
 
-
-
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-if os.path.exists('/usr/local/bin/mscore'):
-    # Docker path (Linux)
-    mscore_path = '/usr/local/bin/mscore'
-    environment.set('musicxmlPath', mscore_path)
-    logger.info(f"Using Docker MuseScore path: {mscore_path}")
-    # Verify if executable
-    is_executable = os.access(mscore_path, os.X_OK)
-    logger.info(f"Is mscore executable: {is_executable}")
-    # Try to run mscore --version to verify installation
-    try:
-        import subprocess
-        result = subprocess.run([mscore_path, '--version'], capture_output=True, text=True)
-        logger.info(f"MuseScore version check: {result.stdout.strip() if result.returncode == 0 else f'Failed with return code {result.returncode}: {result.stderr}'}")
-    except Exception as e:
-        logger.error(f"Error checking MuseScore version: {str(e)}")
-else:
-    # macOS path (local development)
-    mscore_path = '/Applications/MuseScore 4.app/Contents/MacOS/mscore'
-    environment.set('musicxmlPath', mscore_path)
-    logger.info(f"Using macOS MuseScore path: {mscore_path}")
-    # Verify if the path exists
-    path_exists = os.path.exists(mscore_path)
-    logger.info(f"MuseScore path exists: {path_exists}")
+# Initialize MuseScore path
+setup_musescore_path()
 
 warnings.filterwarnings("ignore", message="PySoundFile failed.*")
 warnings.filterwarnings("ignore", category=FutureWarning)

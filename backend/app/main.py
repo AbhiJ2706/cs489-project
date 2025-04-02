@@ -18,10 +18,12 @@ from app.routers.audio.operations import router as audio_router
 from app.routers.auth import router as auth_router
 from app.routers.scores import router as scores_router
 
-# Configure music21 to use a different PDF backend if MuseScore is not available
+# Import and use our unified MuseScore path setup
+from app.utils import setup_musescore_path
+setup_musescore_path()
+
+# Add PDF path setting
 try:
-    # Try to use MuseScore
-    music21.environment.set("musicxmlPath", "musescore")
     music21.environment.set("pdfPath", "musescore")
 except:
     # Fallback to Lilypond if available
