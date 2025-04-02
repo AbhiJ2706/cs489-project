@@ -67,7 +67,13 @@ async def preview_pdf(file_id: str):
     
     return FileResponse(
         path=file_path,
-        media_type="application/pdf"
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": "inline; filename=sheet_music.pdf",
+            "Cache-Control": "public, max-age=3600",
+            "X-Content-Type-Options": "nosniff",
+            "Access-Control-Allow-Origin": "*"
+        }
     )
 
 @router.get("/musicxml-content/{file_id}")

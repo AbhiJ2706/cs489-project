@@ -47,13 +47,16 @@ export function ConversionPanel({ file, onConversionComplete }: ConversionPanelP
       
       // Optional: Add title from filename
       const title = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
-      formData.append("title", title);
+      if (title) {
+        formData.append("title", title);
+      }
 
       // Send the file to the API
       try {
         const data = await apiFetch<ConversionResponse>("convert", {
           method: "POST",
           body: formData,
+          headers: {},
         });
         
         // Set progress to 100% and notify success

@@ -1,9 +1,12 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, FileText, RefreshCw, Trash } from "lucide-react";
 import { apiFetch, apiUrl } from "@/lib/apiUtils";
 import Link from "next/link";
+import PdfViewer from "./PdfViewer";
 
 interface ResultsPanelProps {
   fileId: string;
@@ -135,11 +138,7 @@ export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProp
               <div>
                 <h3 className="text-sm font-medium mb-2">Sheet Music Preview</h3>
                 <div className="aspect-[3/4] w-full bg-muted rounded-md overflow-hidden mb-2 sm:mb-4">
-                  <iframe
-                    src={apiUrl(`preview/${fileId}`)}
-                    className="w-full h-full border-0"
-                    title="Sheet Music Preview"
-                  />
+                  <PdfViewer fileUrl={apiUrl(`preview/${fileId}`)} />
                 </div>
               </div>
             )}

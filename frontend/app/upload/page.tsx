@@ -122,7 +122,10 @@ export default function UploadPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ 
+          url: url,
+          title: null  // Include the title field, even if it's null
+        }),
       });
       
       if (!response.ok) {

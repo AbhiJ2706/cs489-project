@@ -39,31 +39,42 @@ export const apiFetch = async <T = any>(
   path: string,
   options?: RequestInit
 ): Promise<T> => {
-  // Default fetch options with CORS settings
+  // Create default options
   const defaultOptions: RequestInit = {
     mode: 'cors',
     credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-    },
   };
   
-  // Merge default options with provided options
-  const fetchOptions = {
+  // Prepare headers based on body type
+  let headers: HeadersInit = {};
+  
+  // For FormData, don't set Content-Type (browser will set it with boundary)
+  if (!(options?.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+  
+  // Merge headers
+  const mergedHeaders = {
+    ...headers,
+    ...(options?.headers || {})
+  };
+  
+  // Create final fetch options
+  const fetchOptions: RequestInit = {
     ...defaultOptions,
     ...options,
-    headers: {
-      ...defaultOptions.headers,
-      ...(options?.headers || {}),
-    },
+    headers: mergedHeaders
   };
   
+  // Perform fetch
   const response = await fetch(apiUrl(path), fetchOptions);
   
+  // Handle error responses
   if (!response.ok) {
     throw new Error(`API error: ${response.status} ${response.statusText}`);
   }
   
+  // Handle different response types
   const contentType = response.headers.get('content-type');
   if (!contentType || !contentType.includes('application/json')) {
     return response as unknown as T;
