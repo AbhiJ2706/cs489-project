@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 import ffmpeg
 import yt_dlp
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Response
 from sqlmodel import Session
 from typing import Optional
 
@@ -387,6 +387,7 @@ async def convert_spotify(
 @router.post("/convert-url", response_model=ConversionResult)
 async def convert_url(
     url_data: GenericUrl,
+    response: Response,
     current_user: Optional[User] = Depends(get_optional_user),
     session: Session = Depends(get_session)
 ):
