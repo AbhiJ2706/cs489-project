@@ -1,12 +1,13 @@
 "use client";
 
+import { Suspense } from 'react';
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { ScoreGrid } from "@/components/scoreGrid";
 import { useScoreGenerations } from "@/lib/api-hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function SearchPage() {
+const SearchClient = () => {
   const searchParams = useSearchParams();
   const query = searchParams.get("q") || "";
   const { data: scores, isLoading } = useScoreGenerations();
@@ -60,5 +61,13 @@ export default function SearchPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto px-4 py-8">Loading...</div>}>
+      <SearchClient />
+    </Suspense>
   );
 }

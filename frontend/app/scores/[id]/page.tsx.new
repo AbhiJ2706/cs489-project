@@ -1,0 +1,5 @@
+import ScoreDetail from './ScoreDetail';
+
+export default function Page({ params }: { params: { id: string } }) {
+  return <ScoreDetail id={params.id} />;
+}
