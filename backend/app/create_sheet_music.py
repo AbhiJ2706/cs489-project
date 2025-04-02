@@ -214,6 +214,10 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
         time_points = sorted(notes_by_time.keys())
 
         current_end_time = -1
+        gap = __convert_to_time(time_points[0] / (1 / (tp / 4) * 15))
+        r = note.Rest(__closest(gap))
+        treble_part.append(r)
+        bass_part.append(r)
 
         for time_point in time_points:
             notes_at_time = notes_by_time[time_point]
