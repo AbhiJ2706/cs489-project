@@ -38,7 +38,6 @@ async def create_score_generation(
     session.refresh(db_score)
     return db_score
 
-@router.get("/", response_model=List[ScoreGenerationRead])
 @router.get("", response_model=List[ScoreGenerationRead])
 async def get_score_generations(
     skip: int = 0,
