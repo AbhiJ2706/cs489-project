@@ -8,7 +8,7 @@ import librosa.display
 from music21 import (clef, duration, instrument, metadata,
                      meter, note, stream, tempo, tie, converter)
 
-from utils import setup_musescore_path
+from .utils import setup_musescore_path
 from music21 import environment
 import numpy as np
 environment.set(

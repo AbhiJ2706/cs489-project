@@ -6,7 +6,7 @@ import pretty_midi
 from pedalboard import Compressor, Gain, LowShelfFilter, NoiseGate, Pedalboard
 from scipy.signal import butter, filtfilt
 
-from utils import setup_musescore_path
+from .utils import setup_musescore_path
 
 # Initialize MuseScore path
 setup_musescore_path()

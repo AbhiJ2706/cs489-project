@@ -7,11 +7,11 @@ import warnings
 import librosa
 import librosa.display
 
-from utils import setup_musescore_path
-from create_sheet_music import generate_sheet_music, midi_to_musicxml
-from load_audio import load_audio_with_fallback
-from process_audio import detect_notes_and_chords, preprocess_audio
-from visualize import visualize_audio
+from .utils import setup_musescore_path
+from .create_sheet_music import generate_sheet_music, midi_to_musicxml
+from .load_audio import load_audio_with_fallback
+from .process_audio import detect_notes_and_chords, preprocess_audio
+from .visualize import visualize_audio
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
