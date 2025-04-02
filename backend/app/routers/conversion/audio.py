@@ -4,6 +4,7 @@ Audio file conversion endpoints.
 
 import os
 import shutil
+import logging
 from typing import Optional
 from pathlib import Path
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form, Depends
@@ -18,6 +19,9 @@ from app.routers.auth import get_optional_user
 from app.config import TEMP_DIR, SOUNDFONT_PATH
 from app.wav_to_sheet_music import wav_to_sheet_music
 from app.musicxml_to_wav import musicxml_to_wav
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/convert", tags=["conversion"])
 
@@ -116,18 +120,31 @@ async def convert_audio(
         # If user is authenticated, associate the score with the user
         user_id = current_user.id if current_user else None
         
-        db_score = ScoreGeneration(
-            title=score_data.title,
-            file_id=score_data.file_id,
-            youtube_url=score_data.youtube_url,
-            thumbnail_url=score_data.thumbnail_url,
-            user_id=user_id
-        )
-        
-        session.add(db_score)
-        session.commit()
-        session.refresh(db_score)
-        
+        try:
+            logger.info(f"Attempting to save score generation record for file_id: {file_id}")
+            db_score = ScoreGeneration(
+                title=score_data.title,
+                file_id=score_data.file_id,
+                youtube_url=score_data.youtube_url,
+                thumbnail_url=score_data.thumbnail_url,
+                user_id=user_id
+            )
+            
+            session.add(db_score)
+            session.commit()
+            session.refresh(db_score)
+            logger.info(f"Successfully saved score generation record with ID: {db_score.id}")
+        except Exception as e:
+            logger.error(f"Database error when saving score generation record: {str(e)}")
+            # Rollback the session to avoid leaving it in an inconsistent state
+            session.rollback()
+            # Log the full stack trace for debugging
+            import traceback
+            logger.error(f"Stack trace: {traceback.format_exc()}")
+            # Continue execution without failing
+            if not message.endswith(")"): 
+                message += " (database record could not be saved)"
+            
         return ConversionResult(
             file_id=file_id,
             message=message,
