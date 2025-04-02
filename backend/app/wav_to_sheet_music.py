@@ -15,8 +15,6 @@ from .process_audio import detect_notes_and_chords, preprocess_audio
 from .visualize import visualize_audio
 
 
-environment.set(
-    'musicxmlPath', '/Applications/MuseScore 4.app/Contents/MacOS/mscore')
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
