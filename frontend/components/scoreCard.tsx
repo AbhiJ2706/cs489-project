@@ -70,9 +70,9 @@ export function ScoreCard({ score }: ScoreCardProps) {
         <CardTitle className="text-lg truncate">{score.title}</CardTitle>
       </CardHeader>
       
-      <CardContent className="p-4 pt-0 pb-2">
+      {/* <CardContent className="p-4 pt-0 pb-2">
         <p className="text-sm text-muted-foreground">Created {formattedDate}</p>
-      </CardContent>
+      </CardContent> */}
       
       <CardFooter className="p-4 pt-2 flex justify-between">
         <Button 
@@ -90,7 +90,7 @@ export function ScoreCard({ score }: ScoreCardProps) {
           YouTube
         </Button>
         
-        <Button 
+        {/* <Button 
           variant="destructive" 
           size="sm"
           onClick={handleDeleteScore}
@@ -101,7 +101,7 @@ export function ScoreCard({ score }: ScoreCardProps) {
           ) : (
             <Trash2 className="h-4 w-4" />
           )}
-        </Button>
+        </Button> */}
       </CardFooter>
     </Card>
   );

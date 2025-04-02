@@ -39,16 +39,16 @@ export function Navbar() {
   };
 
   const navItems = [
-    {
-      name: "Home",
-      href: "/",
-      isActive: pathname === "/",
-    },
-    {
-      name: "Upload",
-      href: "/upload",
-      isActive: pathname === "/upload",
-    },
+    // {
+    //   name: "Home",
+    //   href: "/",
+    //   isActive: pathname === "/",
+    // },
+    // {
+    //   name: "Upload",
+    //   href: "/upload",
+    //   isActive: pathname === "/upload",
+    // },
   ];
 
   return (
@@ -81,7 +81,7 @@ export function Navbar() {
         </div>
 
         {/* Search */}
-        <div className="hidden md:flex md:flex-1 md:justify-center">
+        {/* <div className="hidden md:flex md:flex-1 md:justify-center">
           <form onSubmit={handleSearch} className="w-full max-w-sm">
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -94,10 +94,10 @@ export function Navbar() {
               />
             </div>
           </form>
-        </div>
+        </div> */}
 
         {/* User Authentication */}
-        <div className="hidden md:flex md:items-center md:justify-end md:flex-1">
+        {/* <div className="hidden md:flex md:items-center md:justify-end md:flex-1">
           {isAuthenticated ? (
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
@@ -130,7 +130,7 @@ export function Navbar() {
               </Button>
             </Link>
           )}
-        </div>
+        </div> */}
 
         {/* Mobile Navigation */}
         <div className="flex md:hidden flex-1 justify-end">
@@ -191,7 +191,7 @@ export function Navbar() {
                   </nav>
                 </div>
 
-                <div className="mt-auto border-t pt-4">
+                {/* <div className="mt-auto border-t pt-4">
                   {isAuthenticated ? (
                     <div className="space-y-4">
                       <div className="flex items-center gap-2">
@@ -231,7 +231,7 @@ export function Navbar() {
                       </Link>
                     </SheetClose>
                   )}
-                </div>
+                </div> */}
               </div>
             </SheetContent>
           </Sheet>

@@ -105,11 +105,8 @@ name = "backend"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-<<<<<<< HEAD
     { name = "alembic" },
-=======
     { name = "demucs" },
->>>>>>> a897f04 (making sheet generation better)
     { name = "fastapi", extra = ["standard"] },
     { name = "ffmpeg-python" },
     { name = "librosa" },

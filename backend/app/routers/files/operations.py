@@ -168,3 +168,40 @@ async def check_files(file_id: str):
         available_files[ext] = file_path.exists()
     
     return available_files
+
+@router.get("/files/{file_id}/view")
+async def view_file(file_id: str, type: str = Query(default="pdf")):
+    """
+    View a file by ID with file type specified as a query parameter.
+    Returns the file with appropriate headers for inline viewing.
+    
+    Args:
+        file_id: ID of the file to view
+        type: Type of file to view (musicxml or pdf), defaults to pdf
+        
+    Returns:
+        FileResponse: The requested file for viewing
+    """
+    if type not in ["musicxml", "pdf"]:
+        raise HTTPException(status_code=400, detail="Invalid file type")
+    
+    file_path = TEMP_DIR / f"{file_id}.{type}"
+    
+    if not file_path.exists():
+        if type == "pdf":
+            raise HTTPException(status_code=404, detail="PDF file could not be generated. Please download the MusicXML file instead.")
+        else:
+            raise HTTPException(status_code=404, detail="File not found")
+    
+    media_type = "application/pdf" if type == "pdf" else "application/xml"
+    
+    return FileResponse(
+        path=file_path,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": "inline",
+            "Cache-Control": "public, max-age=3600",
+            "X-Content-Type-Options": "nosniff",
+            "Access-Control-Allow-Origin": "*"
+        }
+    )

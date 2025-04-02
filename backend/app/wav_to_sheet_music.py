@@ -9,10 +9,10 @@ import librosa.display
 
 from music21 import environment
 
-from create_sheet_music import generate_sheet_music, midi_to_musicxml
-from load_audio import load_audio_with_fallback
-from process_audio import detect_notes_and_chords, preprocess_audio
-from visualize import visualize_audio
+from .create_sheet_music import generate_sheet_music, midi_to_musicxml
+from .load_audio import load_audio_with_fallback
+from .process_audio import detect_notes_and_chords, preprocess_audio
+from .visualize import visualize_audio
 
 
 environment.set(

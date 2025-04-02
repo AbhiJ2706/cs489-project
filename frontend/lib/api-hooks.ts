@@ -46,7 +46,7 @@ export const useScoreGenerations = () => {
       
       return response.json() as Promise<ScoreGeneration[]>;
     },
-    enabled: isBrowser() ? !!localStorage.getItem("auth_token") : false,
+    // enabled: isBrowser() ? !!localStorage.getItem("auth_token") : false,
   });
 };
 
@@ -65,7 +65,7 @@ export const useScoreGeneration = (id: number) => {
       
       return response.json() as Promise<ScoreGeneration>;
     },
-    enabled: !!id && (isBrowser() ? !!localStorage.getItem("auth_token") : false),
+    // enabled: !!id && (isBrowser() ? !!localStorage.getItem("auth_token") : false),
   });
 };
 
