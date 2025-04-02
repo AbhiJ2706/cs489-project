@@ -19,17 +19,17 @@ export default function Home() {
 
   return (
     <>
-      <Navbar />
+      {/* <Navbar /> */}
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 pb-16">
         {/* Hero Section */}
         <section className="relative overflow-hidden border-b">
           <div className="container mx-auto px-4 py-16 sm:py-24">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
               <div className="space-y-6">
-                <div className="inline-flex items-center justify-center p-2 bg-primary/10 rounded-full">
+                {/* <div className="inline-flex items-center justify-center p-2 bg-primary/10 rounded-full">
                   <Music className="h-5 w-5 text-primary" />
                   <span className="ml-2 text-sm font-medium">AI-Powered Sheet Music Generation</span>
-                </div>
+                </div> */}
                 <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
                   Convert Audio to <span className="text-primary">Sheet Music</span> in Seconds
                 </h1>
@@ -49,7 +49,7 @@ export default function Home() {
                   </Button>
                 </div>
               </div>
-              <div className="relative hidden lg:block">
+              {/* <div className="relative hidden lg:block">
                 <div className="absolute inset-0 bg-gradient-to-r from-background to-transparent z-10"></div>
                 <div className="grid grid-cols-2 gap-4 transform rotate-6">
                   {[1, 2, 3, 4].map((i) => (
@@ -60,7 +60,7 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </div> */}
             </div>
           </div>
         </section>

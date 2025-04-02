@@ -42,7 +42,7 @@ async def create_score_generation(
 async def get_score_generations(
     skip: int = 0,
     limit: int = 100,
-    current_user: User = Depends(get_current_user),
+    # current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """Get all score generations for the current user."""

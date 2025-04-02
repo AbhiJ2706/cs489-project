@@ -202,7 +202,7 @@ export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProp
             </div>
 
             {/* MusicXML Viewer */}
-            {availableFiles.musicxml && (
+            {/* {availableFiles.musicxml && (
               <div>
                 <h3 className="text-sm font-medium mb-2">Interactive Viewer</h3>
                 <Link href={`/musicxml-viewer/${fileId}`} target="_blank">
@@ -211,7 +211,7 @@ export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProp
                   </Button>
                 </Link>
               </div>
-            )}
+            )} */}
 
             <div className="pt-2 flex gap-2">
               <Button

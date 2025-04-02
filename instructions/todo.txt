@@ -12,3 +12,7 @@ Abhi
 frontend 
 - flag on frontend to control whether they want all transcripts or just voice 
 - (optionally) choose time signature between 3/4 and 4/4
+
+
+Backend 
+- dedup on youtube url 

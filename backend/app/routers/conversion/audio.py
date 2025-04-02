@@ -6,10 +6,15 @@ import os
 import shutil
 from typing import Optional
 from pathlib import Path
-from fastapi import APIRouter, File, UploadFile, HTTPException, Form
+from fastapi import APIRouter, File, UploadFile, HTTPException, Form, Depends
 from fastapi.responses import FileResponse
+from sqlmodel import Session
 
 from app.models.schemas import ConversionResult
+from app.models.auth import User
+from app.models.score import ScoreGeneration, ScoreGenerationCreate
+from app.db.config import get_session
+from app.routers.auth import get_optional_user
 from app.config import TEMP_DIR, SOUNDFONT_PATH
 from app.wav_to_sheet_music import wav_to_sheet_music
 from app.musicxml_to_wav import musicxml_to_wav
@@ -17,7 +22,12 @@ from app.musicxml_to_wav import musicxml_to_wav
 router = APIRouter(prefix="/convert", tags=["conversion"])
 
 @router.post("", response_model=ConversionResult)
-async def convert_audio(file: UploadFile = File(...), title: Optional[str] = None):
+async def convert_audio(
+    file: UploadFile = File(...), 
+    title: Optional[str] = None,
+    current_user: Optional[User] = Depends(get_optional_user),
+    session: Session = Depends(get_session)
+):
     """
     Convert uploaded WAV file to sheet music (MusicXML and PDF).
     
@@ -29,7 +39,7 @@ async def convert_audio(file: UploadFile = File(...), title: Optional[str] = Non
         ConversionResult: File ID and status message
     """
     # Validate file type
-    if not file.filename.lower().endswith(".wav"):
+    if not file.filename or not file.filename.lower().endswith(".wav"):
         raise HTTPException(status_code=400, detail="Only WAV files are supported")
     
     # Create unique file paths
@@ -44,7 +54,7 @@ async def convert_audio(file: UploadFile = File(...), title: Optional[str] = Non
             shutil.copyfileobj(file.file, f)
         
         # Use the title from the filename if not provided
-        if not title:
+        if not title and file.filename:
             title = os.path.splitext(file.filename)[0]
         
         # Convert WAV to sheet music
@@ -94,6 +104,29 @@ async def convert_audio(file: UploadFile = File(...), title: Optional[str] = Non
         message = "Conversion successful"
         if not has_pdf:
             message += " (PDF generation failed, but MusicXML is available)"
+            
+        # Create score generation record (with or without user)
+        score_data = ScoreGenerationCreate(
+            title=title or "Untitled Score",
+            file_id=file_id,
+            youtube_url=None,  # Not from YouTube
+            thumbnail_url=None  # No thumbnail for direct uploads
+        )
+        
+        # If user is authenticated, associate the score with the user
+        user_id = current_user.id if current_user else None
+        
+        db_score = ScoreGeneration(
+            title=score_data.title,
+            file_id=score_data.file_id,
+            youtube_url=score_data.youtube_url,
+            thumbnail_url=score_data.thumbnail_url,
+            user_id=user_id
+        )
+        
+        session.add(db_score)
+        session.commit()
+        session.refresh(db_score)
         
         return ConversionResult(
             file_id=file_id,

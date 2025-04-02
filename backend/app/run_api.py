@@ -3,7 +3,7 @@
 Script to run the FastAPI server for the DaScore.
 """
 
-from .api import run_server
+from .main import run_server
 from .check_dependencies import main as check_dependencies
 
 if __name__ == "__main__":
