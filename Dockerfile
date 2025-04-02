@@ -10,6 +10,10 @@ RUN apt-get update && apt-get install -y \
     curl \
     unzip \
     wget \
+    # Build tools
+    build-essential \
+    gcc \
+    python3-dev \
     # Additional audio dependencies
     libsndfile1-dev \
     libasound2-dev \
