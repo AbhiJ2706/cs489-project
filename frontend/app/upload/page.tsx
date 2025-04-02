@@ -6,12 +6,13 @@ import { AudioPlayer } from "@/components/audioPlayer";
 import { ConversionPanel } from "@/components/conversionPanel";
 import { ResultsPanel } from "@/components/resultsPanel";
 import { Toaster } from "@/components/ui/sonner";
-import { Music, RefreshCw, Youtube, Music2 } from "lucide-react";
+import { Music, RefreshCw, Youtube, Music2, Clock } from "lucide-react";
 import { apiFetch, getApiBaseUrl } from "@/lib/apiUtils";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import { useCreateScoreGeneration } from "@/lib/api-hooks";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
@@ -42,6 +43,9 @@ export default function UploadPage() {
   // Spotify URL state
   const [spotifyUrl, setSpotifyUrl] = useState<string>("");
   const [isProcessingSpotify, setIsProcessingSpotify] = useState(false);
+
+  // Duration setting
+  const [maxDuration, setMaxDuration] = useState<number>(20);
 
   // UI state
   const [step, setStep] = useState<
@@ -96,7 +100,10 @@ export default function UploadPage() {
   };
 
   // Function to handle URL submission (YouTube or Spotify)
-  const handleUrlSubmit = async (url: string) => {
+  const handleUrlSubmit = async (url: string, maxDuration?: number) => {
+    // Default to 20 seconds if no duration is provided
+    const duration = maxDuration || 20;
+    
     // Detect URL type for UI feedback (processing state)
     const isYoutubeUrl = url.includes("youtube.com") || url.includes("youtu.be");
     const isSpotifyUrl = url.includes("spotify.com/track/") || url.includes("spotify:track:");
@@ -111,16 +118,21 @@ export default function UploadPage() {
       setIsProcessingYoutube(true);
       setYoutubeUrl(url);
       setStep("processing-youtube");
+      // Store the max duration
+      setMaxDuration(duration);
     } else {
       setIsProcessingSpotify(true);
       setSpotifyUrl(url);
       setStep("processing-spotify");
+      // Store the max duration
+      setMaxDuration(duration);
     }
     
     setSelectedFile(null);
     
     try {
       console.log("Processing URL:", url);
+      console.log("Max duration:", duration);
       
       // Call the unified URL API endpoint
       const response = await fetch(`${getApiBaseUrl()}/convert-url`, {
@@ -130,7 +142,8 @@ export default function UploadPage() {
         },
         body: JSON.stringify({ 
           url: url,
-          title: null  // Include the title field, even if it's null
+          title: null,  // Include the title field, even if it's null
+          max_duration: duration  // Add the max_duration parameter
         }),
       });
       
@@ -246,36 +259,38 @@ export default function UploadPage() {
             </div>
             
             {/* YouTube URL input */}
-            <div className="flex flex-col">
-              <Input
-                type="url"
-                value={youtubeUrl}
-                onChange={(e) => {
-                  const url = e.target.value;
-                  setYoutubeUrl(url);
-                }}
-                className="mb-2"
-                placeholder="Enter YouTube URL"
-                disabled={isProcessingYoutube}
-              />
-              
-              {step === "processing-youtube" ? (
-                <div className="flex items-center justify-center py-4">
-                  <RefreshCw className="h-5 w-5 animate-spin text-primary mr-2" />
-                  <p className="text-sm">
-                    Processing... Please wait while we download and convert the audio.
+            <div className="flex flex-col space-y-4">
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium mb-3">Adjust Audio Duration</h4>
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">Clip Length</span>
+                    </div>
+                    <span className="text-sm font-medium">{maxDuration} seconds</span>
+                  </div>
+                  <Slider
+                    value={[maxDuration]}
+                    onValueChange={(values) => setMaxDuration(values[0])}
+                    min={10}
+                    max={60}
+                    step={5}
+                    className="py-2"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Shorter clips process faster (10-60 seconds)
                   </p>
                 </div>
-              ) : (
                 <Button
-                  onClick={() => handleUrlSubmit(youtubeUrl)}
+                  onClick={() => handleUrlSubmit(youtubeUrl, maxDuration)}
                   disabled={!youtubeUrl || !validateYoutubeUrl(youtubeUrl) || isProcessingYoutube}
                   className="w-full"
                 >
                   {isProcessingYoutube ? "Processing..." : 
                     step === "results" ? "Try Another YouTube Video" : "Convert to Sheet Music"}
                 </Button>
-              )}
+              </div>
             </div>
           </div>
         </CardContent>
@@ -324,14 +339,39 @@ export default function UploadPage() {
                 </p>
               </div>
             ) : (
-              <Button
-                onClick={() => handleUrlSubmit(spotifyUrl)}
-                disabled={!spotifyUrl || !validateSpotifyUrl(spotifyUrl) || isProcessingSpotify}
-                className="w-full"
-              >
-                {isProcessingSpotify ? "Processing..." : 
-                  step === "results" ? "Try Another Spotify Track" : "Convert to Sheet Music"}
-              </Button>
+              <div className="flex flex-col space-y-4">
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium mb-3">Adjust Audio Duration</h4>
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">Clip Length</span>
+                      </div>
+                      <span className="text-sm font-medium">{maxDuration} seconds</span>
+                    </div>
+                    <Slider
+                      value={[maxDuration]}
+                      onValueChange={(values) => setMaxDuration(values[0])}
+                      min={10}
+                      max={60}
+                      step={5}
+                      className="py-2"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Shorter clips process faster (10-60 seconds)
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => handleUrlSubmit(spotifyUrl, maxDuration)}
+                    disabled={!spotifyUrl || !validateSpotifyUrl(spotifyUrl) || isProcessingSpotify}
+                    className="w-full"
+                  >
+                    {isProcessingSpotify ? "Processing..." : 
+                      step === "results" ? "Try Another Spotify Track" : "Convert to Sheet Music"}
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         </CardContent>
@@ -358,7 +398,7 @@ export default function UploadPage() {
         {step === "upload" && (
           <FileUpload 
             onFileSelect={handleFileSelect} 
-            onUrlSubmit={handleUrlSubmit}
+            onUrlSubmit={(url, maxDuration) => handleUrlSubmit(url, maxDuration)}
           />
         )}
         

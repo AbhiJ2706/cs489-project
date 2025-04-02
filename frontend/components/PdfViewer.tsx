@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
@@ -22,6 +22,34 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
   const [scale, setScale] = useState<number>(1.0);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number | null>(null);
+
+  useEffect(() => {
+    const updateContainerWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.clientWidth);
+      }
+    };
+
+    // Initial measurement
+    updateContainerWidth();
+
+    // Set up resize observer
+    const resizeObserver = new ResizeObserver(updateContainerWidth);
+    const currentRef = containerRef.current;
+    
+    if (currentRef) {
+      resizeObserver.observe(currentRef);
+    }
+
+    // Clean up
+    return () => {
+      if (currentRef) {
+        resizeObserver.unobserve(currentRef);
+      }
+    };
+  }, []);
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }): void {
     setNumPages(numPages);
@@ -59,7 +87,7 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
   }
 
   return (
-    <div className="flex flex-col w-full h-full">
+    <div className="flex flex-col w-full h-full" ref={containerRef}>
       {loading && !error && (
         <div className="flex flex-col items-center justify-center h-full p-4">
           <Skeleton className="h-[400px] w-full" />
@@ -81,20 +109,24 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
         </div>
       )}
 
-      <div className={`document-container flex flex-col items-center overflow-auto ${loading || error ? 'hidden' : ''}`}>
+      <div 
+        className={`document-container flex flex-col items-center max-w-full overflow-y-auto overflow-x-hidden ${loading || error ? 'hidden' : ''}`}
+        style={{ maxWidth: '100%' }}
+      >
         <Document
           file={fileUrl}
           onLoadSuccess={onDocumentLoadSuccess}
           onLoadError={onDocumentLoadError}
           loading={<Skeleton className="h-[400px] w-full" />}
-          className="pdf-document"
+          className="pdf-document max-w-full"
         >
           <Page
             pageNumber={pageNumber}
             scale={scale}
             renderTextLayer={false}
             renderAnnotationLayer={false}
-            className="pdf-page"
+            className="pdf-page max-w-full"
+            width={containerWidth ? containerWidth - 20 : undefined}
           />
         </Document>
       </div>

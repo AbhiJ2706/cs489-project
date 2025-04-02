@@ -8,8 +8,9 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Music, Upload, AlertCircle, Youtube, Music2, Link } from "lucide-react";
+import { Music, Upload, AlertCircle, Youtube, Music2, Link, Clock } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Slider } from "@/components/ui/slider";
 import dynamic from "next/dynamic";
 import { redirectToAuthCodeFlow } from '@/lib/spotify-api';
 
@@ -21,7 +22,7 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
 interface FileUploadProps {
   onFileSelect: (file: File) => void;
-  onUrlSubmit?: (url: string) => void;
+  onUrlSubmit?: (url: string, maxDuration: number) => void;
 }
 
 export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
@@ -39,6 +40,9 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
   const [urlError, setUrlError] = useState<string | null>(null);
   const [urlType, setUrlType] = useState<"youtube" | "spotify" | null>(null);
   const [isAuthenticatedWithSpotify, setIsAuthenticatedWithSpotify] = useState(false);
+  
+  // Duration setting
+  const [maxDuration, setMaxDuration] = useState<number>(20);
   
   useEffect(() => {
     const accessToken = localStorage.getItem('accessToken');
@@ -146,13 +150,14 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
     
     try {
       if (onUrlSubmit) {
-        onUrlSubmit(url);
+        // Pass both URL and duration to the parent component
+        onUrlSubmit(url, maxDuration);
       }
     } catch (error) {
       setUrlError("Failed to process URL. Please try again.");
       console.error("URL processing error:", error);
     } finally {
-      // Don't set isProcessingUrl to false here, since the caller will handle success/failure
+      setIsProcessingUrl(false);
     }
   };
 
@@ -266,6 +271,28 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
                     )}
                   </div>
                 )}
+              </div>
+              
+              {/* Duration Slider - always show it */}
+              <div className="space-y-2 border-t border-dashed pt-3 mt-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">Audio Duration</span>
+                  </div>
+                  <span className="text-sm font-medium">{maxDuration} seconds</span>
+                </div>
+                <Slider
+                  value={[maxDuration]}
+                  onValueChange={(values) => setMaxDuration(values[0])}
+                  min={10}
+                  max={60}
+                  step={5}
+                  className="py-2"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Use the slider to adjust the length of audio to convert (shorter clips process faster)
+                </p>
               </div>
               
               {/* Preview for YouTube URLs */}

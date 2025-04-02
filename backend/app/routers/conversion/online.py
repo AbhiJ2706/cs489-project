@@ -37,13 +37,14 @@ async def convert_youtube(
     Download audio from a YouTube URL, convert to WAV, and generate sheet music.
     
     Args:
-        youtube_data: The YouTube URL to process
+        youtube_data: The YouTube URL to process with optional max_duration
         
     Returns:
         ConversionResult: File ID and status message
     """
     url = youtube_data.url
     title = youtube_data.title
+    max_duration = youtube_data.max_duration or 20  # Use provided duration or default to 20 seconds
     
     # Create unique file ID and paths
     file_id = f"{os.urandom(4).hex()}"
@@ -65,9 +66,17 @@ async def convert_youtube(
             'cookiefile': '/app/backend/youtube-cookies.txt',  # Use cookies file to bypass bot protection
         }
         
+        # Variable to store the original audio duration
+        original_duration = None
+        
         # Download audio from YouTube
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
+            
+            # Extract the original duration if available
+            original_duration = info.get('duration')
+            if original_duration:
+                logger.info(f"Original YouTube video duration: {original_duration} seconds")
             
             # If title wasn't provided, use the video title
             if not title:
@@ -94,10 +103,13 @@ async def convert_youtube(
                 # First try using the ffmpeg-python library
                 ffmpeg.input(str(downloaded_file)).output(
                     str(wav_path), 
-                    ar=44100,  # Audio sample rate
-                    ac=2,      # Stereo audio
-                    acodec='pcm_s16le'  # 16-bit PCM encoding for WAV
+                    ar=44100,    # Audio sample rate
+                    ac=2,        # Stereo audio
+                    acodec='pcm_s16le',  # 16-bit PCM encoding for WAV
+                    t=max_duration         # Limit to specified seconds
                 ).overwrite_output().run(quiet=True, capture_stdout=True, capture_stderr=True)
+                
+                logger.info(f"Created {max_duration}-second WAV clip from YouTube audio: {wav_path}")
             except Exception as e:
                 # If the ffmpeg-python library fails, fall back to subprocess if ffmpeg is available
                 print(f"FFmpeg-python error: {str(e)}")
@@ -105,9 +117,13 @@ async def convert_youtube(
                     subprocess.run([
                         'ffmpeg', '-i', str(downloaded_file), 
                         '-ar', '44100', '-ac', '2', 
-                        '-acodec', 'pcm_s16le', str(wav_path),
+                        '-acodec', 'pcm_s16le',
+                        '-t', str(max_duration),  # Limit to specified seconds
+                        str(wav_path),
                         '-y', '-loglevel', 'error'
                     ], check=True)
+                    
+                    logger.info(f"Created {max_duration}-second WAV clip from YouTube audio using subprocess: {wav_path}")
                 else:
                     raise HTTPException(
                         status_code=500,
@@ -220,7 +236,8 @@ async def convert_youtube(
         return ConversionResult(
             file_id=file_id,
             message=message,
-            has_pdf=has_pdf
+            has_pdf=has_pdf,
+            duration=original_duration
         )
     
     except Exception as e:
@@ -246,13 +263,14 @@ async def convert_spotify(
     Download audio from a Spotify URL, convert to WAV, and generate sheet music.
     
     Args:
-        spotify_data: The Spotify URL to process
+        spotify_data: The Spotify URL to process with optional max_duration
         
     Returns:
         ConversionResult: File ID and status message
     """
     url = spotify_data.url
     title = spotify_data.title
+    max_duration = spotify_data.max_duration or 20  # Use provided duration or default to 20 seconds
     
     # Create unique file ID and paths
     file_id = f"{os.urandom(4).hex()}"
@@ -272,6 +290,9 @@ async def convert_spotify(
             track_id = url.split("spotify:track:")[1].split("?")[0]
         else:
             raise HTTPException(status_code=400, detail="Invalid Spotify URL. Please provide a link to a specific track.")
+        
+        # Variable to store the original audio duration
+        original_duration = None
 
         # Check if spotdl is installed
         try:
@@ -304,30 +325,52 @@ async def convert_spotify(
             downloaded_file = downloaded_files[0]
             print(f"Downloaded file: {downloaded_file}")
             
+            # Get the audio duration using ffprobe
+            try:
+                probe = ffmpeg.probe(str(downloaded_file))
+                if 'format' in probe and 'duration' in probe['format']:
+                    original_duration = float(probe['format']['duration'])
+                    logger.info(f"Original Spotify track duration: {original_duration} seconds")
+            except Exception as e:
+                logger.warning(f"Could not get duration from audio file: {str(e)}")
+            
             # If title wasn't provided, use the track title
             if not title:
                 title = downloaded_file.stem
             
             # Convert to WAV using ffmpeg
             try:
+                # Try using the ffmpeg-python library
                 ffmpeg.input(str(downloaded_file)).output(
                     str(wav_path), 
-                    ar=44100,  # Audio sample rate
-                    ac=2,      # Stereo audio
-                    acodec='pcm_s16le'  # 16-bit PCM encoding for WAV
+                    ar=44100,    # Audio sample rate
+                    ac=2,        # Stereo audio
+                    acodec='pcm_s16le',  # 16-bit PCM encoding for WAV
+                    t=max_duration         # Limit to specified seconds
                 ).overwrite_output().run(quiet=True, capture_stdout=True, capture_stderr=True)
                 
                 print(f"Converted {downloaded_file} to WAV: {wav_path}")
-                
-            except ffmpeg.Error as e:
-                # If the ffmpeg-python library fails, fall back to subprocess
-                print(f"ffmpeg.Error: {str(e)}, falling back to subprocess")
-                subprocess.run([
-                    'ffmpeg', '-i', str(downloaded_file), 
-                    '-ar', '44100', '-ac', '2', 
-                    '-acodec', 'pcm_s16le', str(wav_path),
-                    '-y', '-loglevel', 'error'
-                ], check=True)
+                logger.info(f"Created {max_duration}-second WAV clip from Spotify audio: {wav_path}")
+            except Exception as e:
+                # If the ffmpeg-python library fails, fall back to subprocess if ffmpeg is available
+                print(f"FFmpeg-python error: {str(e)}")
+                try:
+                    subprocess.run([
+                        'ffmpeg', '-i', str(downloaded_file), 
+                        '-ar', '44100', '-ac', '2', 
+                        '-acodec', 'pcm_s16le',
+                        '-t', str(max_duration),  # Limit to specified seconds
+                        str(wav_path),
+                        '-y', '-loglevel', 'error'
+                    ], check=True)
+                    
+                    print(f"Converted {downloaded_file} to WAV: {wav_path}")
+                    logger.info(f"Created {max_duration}-second WAV clip from Spotify audio using subprocess: {wav_path}")
+                except Exception as sub_e:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"FFmpeg conversion failed: {str(sub_e)}"
+                    )
             
             # Clean up downloaded file
             if downloaded_file.exists():
@@ -424,7 +467,8 @@ async def convert_spotify(
         return ConversionResult(
             file_id=file_id,
             message=message,
-            has_pdf=has_pdf
+            has_pdf=has_pdf,
+            duration=original_duration
         )
     
     except Exception as e:
@@ -456,22 +500,18 @@ async def convert_url(
     Returns:
         ConversionResult: File ID and status message
     """
-    # Add CORS headers explicitly
-    # response.headers["Access-Control-Allow-Origin"] = "*"
-    # response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-    # response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    
+ 
     url = url_data.url
     title = url_data.title
     
     # Auto-detect URL type
     if "youtube.com" in url or "youtu.be" in url or "music.youtube.com" in url:
         # Handle as YouTube URL
-        youtube_data = YouTubeUrl(url=url, title=title)
+        youtube_data = YouTubeUrl(url=url, title=title, max_duration=url_data.max_duration)
         return await convert_youtube(youtube_data, current_user, session)
     elif "spotify.com/track/" in url or "spotify:track:" in url:
         # Handle as Spotify URL
-        spotify_data = SpotifyUrl(url=url, title=title)
+        spotify_data = SpotifyUrl(url=url, title=title, max_duration=url_data.max_duration)
         return await convert_spotify(spotify_data, current_user, session)
     else:
         # Unknown URL type
