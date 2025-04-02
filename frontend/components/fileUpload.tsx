@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, ChangeEvent } from "react";
+import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -23,6 +24,7 @@ interface FileUploadProps {
 }
 
 export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
+  const { isAuthenticated } = useAuth();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -141,6 +143,11 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
         </CardTitle>
         <CardDescription>
           Upload a WAV file or provide a YouTube/Spotify URL
+          {isAuthenticated && (
+            <span className="block mt-1 text-xs text-green-500">
+              Your score sheet will be saved to your account
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent>

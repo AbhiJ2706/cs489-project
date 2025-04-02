@@ -8,9 +8,15 @@ import subprocess
 from pathlib import Path
 import ffmpeg
 import yt_dlp
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Depends, status
+from sqlmodel import Session
+from typing import Optional
 
 from app.models.schemas import ConversionResult, YouTubeUrl, SpotifyUrl, GenericUrl
+from app.models.auth import User
+from app.models.score import ScoreGeneration, ScoreGenerationCreate
+from app.db.config import get_session
+from app.routers.auth import get_optional_user
 from app.config import TEMP_DIR, SOUNDFONT_PATH
 from app.wav_to_sheet_music import wav_to_sheet_music
 from app.musicxml_to_wav import musicxml_to_wav
@@ -18,7 +24,11 @@ from app.musicxml_to_wav import musicxml_to_wav
 router = APIRouter(tags=["conversion"])
 
 @router.post("/convert-youtube", response_model=ConversionResult)
-async def convert_youtube(youtube_data: YouTubeUrl):
+async def convert_youtube(
+    youtube_data: YouTubeUrl,
+    current_user: Optional[User] = Depends(get_optional_user),
+    session: Session = Depends(get_session)
+):
     """
     Download audio from a YouTube URL, convert to WAV, and generate sheet music.
     
@@ -153,6 +163,41 @@ async def convert_youtube(youtube_data: YouTubeUrl):
         if not has_pdf:
             message += " (PDF generation failed, but MusicXML is available)"
         
+        # Create a score generation record if user is authenticated
+        if current_user:
+            # Extract thumbnail URL from YouTube video if available
+            thumbnail_url = None
+            try:
+                with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    thumbnails = info.get('thumbnails', [])
+                    if thumbnails:
+                        # Get the highest quality thumbnail
+                        thumbnails.sort(key=lambda x: x.get('height', 0) * x.get('width', 0), reverse=True)
+                        thumbnail_url = thumbnails[0].get('url')
+            except Exception as e:
+                print(f"Error extracting thumbnail: {str(e)}")
+            
+            # Create score generation record
+            score_data = ScoreGenerationCreate(
+                title=title,
+                file_id=file_id,
+                youtube_url=url,
+                thumbnail_url=thumbnail_url
+            )
+            
+            db_score = ScoreGeneration(
+                title=score_data.title,
+                file_id=score_data.file_id,
+                youtube_url=score_data.youtube_url,
+                thumbnail_url=score_data.thumbnail_url,
+                user_id=current_user.id
+            )
+            
+            session.add(db_score)
+            session.commit()
+            session.refresh(db_score)
+        
         return ConversionResult(
             file_id=file_id,
             message=message,
@@ -173,7 +218,11 @@ async def convert_youtube(youtube_data: YouTubeUrl):
         )
 
 @router.post("/convert-spotify", response_model=ConversionResult)
-async def convert_spotify(spotify_data: SpotifyUrl):
+async def convert_spotify(
+    spotify_data: SpotifyUrl,
+    current_user: Optional[User] = Depends(get_optional_user),
+    session: Session = Depends(get_session)
+):
     """
     Download audio from a Spotify URL, convert to WAV, and generate sheet music.
     
@@ -336,7 +385,11 @@ async def convert_spotify(spotify_data: SpotifyUrl):
         )
 
 @router.post("/convert-url", response_model=ConversionResult)
-async def convert_url(url_data: GenericUrl, response: Response):
+async def convert_url(
+    url_data: GenericUrl,
+    current_user: Optional[User] = Depends(get_optional_user),
+    session: Session = Depends(get_session)
+):
     """
     Auto-detect URL type (YouTube or Spotify) and process accordingly.
     
@@ -358,11 +411,11 @@ async def convert_url(url_data: GenericUrl, response: Response):
     if "youtube.com" in url or "youtu.be" in url or "music.youtube.com" in url:
         # Handle as YouTube URL
         youtube_data = YouTubeUrl(url=url, title=title)
-        return await convert_youtube(youtube_data)
+        return await convert_youtube(youtube_data, current_user, session)
     elif "spotify.com/track/" in url or "spotify:track:" in url:
         # Handle as Spotify URL
         spotify_data = SpotifyUrl(url=url, title=title)
-        return await convert_spotify(spotify_data)
+        return await convert_spotify(spotify_data, current_user, session)
     else:
         # Unknown URL type
         raise HTTPException(

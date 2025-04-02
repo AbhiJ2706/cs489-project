@@ -15,6 +15,8 @@ from app.routers.conversion.audio import router as audio_conversion_router
 from app.routers.conversion.online import router as online_conversion_router
 from app.routers.files.operations import router as files_router
 from app.routers.audio.operations import router as audio_router
+from app.routers.auth import router as auth_router
+from app.routers.scores import router as scores_router
 
 # Configure music21 to use a different PDF backend if MuseScore is not available
 try:
@@ -52,6 +54,8 @@ app.include_router(audio_conversion_router)
 app.include_router(online_conversion_router)
 app.include_router(files_router)
 app.include_router(audio_router)
+app.include_router(auth_router)
+app.include_router(scores_router)
 
 def run_server():
     """Run the FastAPI server."""
