@@ -12,9 +12,9 @@ from app.models.auth import User
 from app.models.score import ScoreGeneration, ScoreGenerationCreate, ScoreGenerationRead
 from app.routers.auth import get_current_user, get_optional_user
 
-router = APIRouter(prefix="/scores", tags=["scores"])
+router = APIRouter(tags=["scores"])
 
-@router.post("", response_model=ScoreGenerationRead)
+@router.post("/scores", response_model=ScoreGenerationRead)
 async def create_score_generation(
     score: ScoreGenerationCreate,
     current_user: Optional[User] = Depends(get_optional_user),
@@ -38,7 +38,7 @@ async def create_score_generation(
     session.refresh(db_score)
     return db_score
 
-@router.get("", response_model=List[ScoreGenerationRead])
+@router.get("/scores", response_model=List[ScoreGenerationRead])
 async def get_score_generations(
     skip: int = 0,
     limit: int = 100,
@@ -55,7 +55,7 @@ async def get_score_generations(
     ).all()
     return scores
 
-@router.get("/recent", response_model=List[ScoreGenerationRead])
+@router.get("/scores/recent", response_model=List[ScoreGenerationRead])
 async def get_recent_scores(
     skip: int = 0,
     limit: int = 20,
@@ -74,7 +74,7 @@ async def get_recent_scores(
     ).all()
     return scores
 
-@router.get("/featured", response_model=List[ScoreGenerationRead])
+@router.get("/scores/featured", response_model=List[ScoreGenerationRead])
 async def get_featured_scores(
     limit: int = Query(20, ge=1, le=50),
     session: Session = Depends(get_session)
@@ -104,7 +104,40 @@ async def get_featured_scores(
     
     return scores
 
-@router.get("/{score_id}", response_model=ScoreGenerationRead)
+@router.get("/scores/search", response_model=List[ScoreGenerationRead])
+async def search_scores(
+    query: str,
+    limit: int = Query(20, ge=1, le=50),
+    current_user: Optional[User] = Depends(get_optional_user),
+    session: Session = Depends(get_session)
+):
+    """Search for scores by title or YouTube URL.
+    
+    If the user is authenticated, they can search all scores.
+    If the user is not authenticated, they can only search public scores.
+    """
+    search_query = f"%{query}%"
+    
+    # Build the base query
+    base_query = select(ScoreGeneration).where(
+        (ScoreGeneration.title.ilike(search_query)) | 
+        (ScoreGeneration.youtube_url.ilike(search_query))
+    )
+    
+    # If user is authenticated, filter by user_id
+    if current_user is not None:
+        base_query = base_query.where(ScoreGeneration.user_id == current_user.id)
+    
+    # Execute the query
+    scores = session.exec(
+        base_query
+        .limit(limit)
+        .order_by(desc(ScoreGeneration.created_at))
+    ).all()
+    
+    return scores
+
+@router.get("/scores/{score_id}", response_model=ScoreGenerationRead)
 async def get_score_generation(
     score_id: int,
     current_user: Optional[User] = Depends(get_optional_user),
@@ -136,7 +169,7 @@ async def get_score_generation(
     
     return score
 
-@router.delete("/{score_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/scores/{score_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_score_generation(
     score_id: int,
     current_user: User = Depends(get_current_user),
@@ -163,7 +196,7 @@ async def delete_score_generation(
     
     return None
 
-@router.get("/search", response_model=List[ScoreGenerationRead])
+@router.get("/scores/search", response_model=List[ScoreGenerationRead])
 async def search_scores(
     query: str,
     limit: int = Query(20, ge=1, le=50),
