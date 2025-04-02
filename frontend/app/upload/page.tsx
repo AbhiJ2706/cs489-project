@@ -20,6 +20,12 @@ import dynamic from "next/dynamic";
 // Import ReactPlayer dynamically to avoid SSR issues
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
+// Import PdfViewer dynamically to avoid SSR issues with PDF.js
+const DynamicPdfViewer = dynamic(() => import("@/components/PdfViewer"), { 
+  ssr: false,
+  loading: () => <div>Loading PDF viewer...</div>
+});
+
 export default function UploadPage() {
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();

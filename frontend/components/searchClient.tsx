@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
@@ -6,7 +6,7 @@ import { ScoreGrid } from "@/components/scoreGrid";
 import { useScoreGenerations } from "@/lib/api-hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function SearchClient() {
+export function SearchClient() {
   const searchParams = useSearchParams();
   const query = searchParams.get("q") || "";
   const { data: scores, isLoading } = useScoreGenerations();
@@ -15,8 +15,8 @@ export default function SearchClient() {
   useEffect(() => {
     if (scores && query) {
       const lowercaseQuery = query.toLowerCase();
-      const filtered = scores.filter(score => 
-        score.title.toLowerCase().includes(lowercaseQuery) || 
+      const filtered = scores.filter(score =>
+        score.title.toLowerCase().includes(lowercaseQuery) ||
         (score.youtube_url && score.youtube_url.toLowerCase().includes(lowercaseQuery))
       );
       setFilteredScores(filtered);
@@ -48,12 +48,16 @@ export default function SearchClient() {
             </div>
           ))}
         </div>
-      ) : filteredScores.length > 0 ? (
-        <ScoreGrid scores={filteredScores} isLoading={isLoading} />
       ) : (
-        <div className="text-center py-12">
-          <p className="text-lg text-muted-foreground">No scores found matching "{query}"</p>
-        </div>
+        <>
+          {filteredScores.length > 0 ? (
+            <ScoreGrid scores={filteredScores} isLoading={isLoading} />
+          ) : (
+            <div className="text-center py-10">
+              <p className="text-muted-foreground">No scores found matching your search criteria.</p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

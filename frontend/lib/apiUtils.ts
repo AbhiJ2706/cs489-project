@@ -41,52 +41,52 @@ export const apiFetch = async <T = any>(
 ): Promise<T> => {
   // Create default options
   const defaultOptions: RequestInit = {
-    mode: 'cors',
-    credentials: 'same-origin',
+    mode: "cors",
+    credentials: "same-origin",
   };
-  
+
   // Prepare headers based on body type
-  let headers: HeadersInit = {};
-  
+  const headers: HeadersInit = {};
+
   // For FormData, don't set Content-Type (browser will set it with boundary)
   if (!(options?.body instanceof FormData)) {
-    headers['Content-Type'] = 'application/json';
+    headers["Content-Type"] = "application/json";
   }
-  
+
   // Merge headers
   const mergedHeaders = {
     ...headers,
-    ...(options?.headers || {})
+    ...(options?.headers || {}),
   };
-  
+
   // Create final fetch options
   const fetchOptions: RequestInit = {
     ...defaultOptions,
     ...options,
-    headers: mergedHeaders
+    headers: mergedHeaders,
   };
-  
+
   // Perform fetch
   const response = await fetch(apiUrl(path), fetchOptions);
-  
+
   // Handle error responses
   if (!response.ok) {
     throw new Error(`API error: ${response.status} ${response.statusText}`);
   }
-  
+
   // Handle different response types
-  const contentType = response.headers.get('content-type');
-  if (!contentType || !contentType.includes('application/json')) {
+  const contentType = response.headers.get("content-type");
+  if (!contentType || !contentType.includes("application/json")) {
     return response as unknown as T;
   }
-  
+
   // Parse JSON for JSON responses
   try {
     const data = await response.json();
     return data as T;
   } catch (error) {
-    console.error('Error parsing JSON response:', error);
-    throw new Error('Failed to parse API response as JSON');
+    console.error("Error parsing JSON response:", error);
+    throw new Error("Failed to parse API response as JSON");
   }
 };
 
@@ -97,7 +97,7 @@ export const apiFetch = async <T = any>(
  */
 export const apiDownload = (path: string, filename: string): void => {
   const url = apiUrl(path);
-  const link = document.createElement('a');
+  const link = document.createElement("a");
   link.href = url;
   link.download = filename;
   document.body.appendChild(link);

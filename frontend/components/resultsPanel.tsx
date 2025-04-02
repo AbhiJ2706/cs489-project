@@ -6,7 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Download, FileText, RefreshCw, Trash } from "lucide-react";
 import { apiFetch, apiUrl } from "@/lib/apiUtils";
 import Link from "next/link";
-import PdfViewer from "./PdfViewer";
+import dynamic from "next/dynamic";
+
+// Import PdfViewer dynamically to avoid SSR issues with PDF.js
+const DynamicPdfViewer = dynamic(() => import("./PdfViewer"), { 
+  ssr: false,
+  loading: () => <div>Loading PDF viewer...</div>
+});
 
 interface ResultsPanelProps {
   fileId: string;
@@ -138,7 +144,7 @@ export function ResultsPanel({ fileId, originalFile, onReset }: ResultsPanelProp
               <div>
                 <h3 className="text-sm font-medium mb-2">Sheet Music Preview</h3>
                 <div className="aspect-[3/4] w-full bg-muted rounded-md overflow-hidden mb-2 sm:mb-4">
-                  <PdfViewer fileUrl={apiUrl(`preview/${fileId}`)} />
+                  <DynamicPdfViewer fileUrl={apiUrl(`preview/${fileId}`)} />
                 </div>
               </div>
             )}
