@@ -20,6 +20,9 @@ RUN apt-get update && apt-get install -y \
     libavformat-dev \
     libavutil-dev \
     libswresample-dev \
+    # PostgreSQL development packages
+    postgresql-client \
+    libpq-dev \
     # Dependencies for MuseScore
     xvfb \
     libopengl0 \
