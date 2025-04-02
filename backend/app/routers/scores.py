@@ -48,7 +48,7 @@ async def get_score_generations(
     """Get all score generations for the current user."""
     scores = session.exec(
         select(ScoreGeneration)
-        .where(ScoreGeneration.user_id == current_user.id)
+        # .where(ScoreGeneration.user_id == current_user.id)
         .offset(skip)
         .limit(limit)
         .order_by(desc(ScoreGeneration.created_at))

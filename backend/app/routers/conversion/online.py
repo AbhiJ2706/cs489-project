@@ -163,40 +163,41 @@ async def convert_youtube(
         if not has_pdf:
             message += " (PDF generation failed, but MusicXML is available)"
         
-        # Create a score generation record if user is authenticated
-        if current_user:
-            # Extract thumbnail URL from YouTube video if available
-            thumbnail_url = None
-            try:
-                with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl:
-                    info = ydl.extract_info(url, download=False)
-                    thumbnails = info.get('thumbnails', [])
-                    if thumbnails:
-                        # Get the highest quality thumbnail
-                        thumbnails.sort(key=lambda x: x.get('height', 0) * x.get('width', 0), reverse=True)
-                        thumbnail_url = thumbnails[0].get('url')
-            except Exception as e:
-                print(f"Error extracting thumbnail: {str(e)}")
-            
-            # Create score generation record
-            score_data = ScoreGenerationCreate(
-                title=title,
-                file_id=file_id,
-                youtube_url=url,
-                thumbnail_url=thumbnail_url
-            )
-            
-            db_score = ScoreGeneration(
-                title=score_data.title,
-                file_id=score_data.file_id,
-                youtube_url=score_data.youtube_url,
-                thumbnail_url=score_data.thumbnail_url,
-                user_id=current_user.id
-            )
-            
-            session.add(db_score)
-            session.commit()
-            session.refresh(db_score)
+        # Extract thumbnail URL from YouTube video if available
+        thumbnail_url = None
+        try:
+            with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl:
+                info = ydl.extract_info(url, download=False)
+                thumbnails = info.get('thumbnails', [])
+                if thumbnails:
+                    # Get the highest quality thumbnail
+                    thumbnails.sort(key=lambda x: x.get('height', 0) * x.get('width', 0), reverse=True)
+                    thumbnail_url = thumbnails[0].get('url')
+        except Exception as e:
+            print(f"Error extracting thumbnail: {str(e)}")
+        
+        # Create score generation record (with or without user)
+        score_data = ScoreGenerationCreate(
+            title=title,
+            file_id=file_id,
+            youtube_url=url,
+            thumbnail_url=thumbnail_url
+        )
+        
+        # If user is authenticated, associate the score with the user
+        user_id = current_user.id if current_user else None
+        
+        db_score = ScoreGeneration(
+            title=score_data.title,
+            file_id=score_data.file_id,
+            youtube_url=score_data.youtube_url,
+            thumbnail_url=score_data.thumbnail_url,
+            user_id=user_id
+        )
+        
+        session.add(db_score)
+        session.commit()
+        session.refresh(db_score)
         
         return ConversionResult(
             file_id=file_id,
@@ -365,6 +366,29 @@ async def convert_spotify(
         if not has_pdf:
             message += " (PDF generation failed, but MusicXML is available)"
         
+        # Create score generation record (with or without user)
+        score_data = ScoreGenerationCreate(
+            title=title,
+            file_id=file_id,
+            youtube_url=None,  # Not from YouTube
+            thumbnail_url=None  # Spotify doesn't provide thumbnails in the same way
+        )
+        
+        # If user is authenticated, associate the score with the user
+        user_id = current_user.id if current_user else None
+        
+        db_score = ScoreGeneration(
+            title=score_data.title,
+            file_id=score_data.file_id,
+            youtube_url=score_data.youtube_url,
+            thumbnail_url=score_data.thumbnail_url,
+            user_id=user_id
+        )
+        
+        session.add(db_score)
+        session.commit()
+        session.refresh(db_score)
+        
         return ConversionResult(
             file_id=file_id,
             message=message,
@@ -401,9 +425,9 @@ async def convert_url(
         ConversionResult: File ID and status message
     """
     # Add CORS headers explicitly
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    # response.headers["Access-Control-Allow-Origin"] = "*"
+    # response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+    # response.headers["Access-Control-Allow-Headers"] = "Content-Type"
     
     url = url_data.url
     title = url_data.title
