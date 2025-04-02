@@ -1,0 +1,14 @@
+Abhi
+- Allow for silences between notes
+- Allow for multiple notes at the same time
+- Record any silent start time as rests
+- Record and silent ending time as rests
+- Stitch together transcripts by voice
+- Determine if stem is quiet and if so skip it
+- fix pitch detection to remove the issue with octaves
+- fix quantization of note duration which gemini also doesn't like
+- more visualizations for the report
+
+frontend 
+- flag on frontend to control whether they want all transcripts or just voice 
+- (optionally) choose time signature between 3/4 and 4/4

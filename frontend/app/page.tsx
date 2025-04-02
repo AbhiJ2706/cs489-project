@@ -134,7 +134,16 @@ export default function Home() {
         </section>
 
         <footer className="container mx-auto px-4 py-8 border-t text-center">
-          <p className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} DaScore. All rights reserved.</p>
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} DaScore. All rights reserved.</p>
+            <p className="text-sm text-muted-foreground">
+              Made with ❤️ by{" "}
+              <a href="https://x.com/abhijain2706" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abhi</a>,{" "}
+              <a href="https://x.com/onlychans1" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Eden</a>,{" "}
+              <a href="https://x.com/itsraiyansayeed" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Raiyan</a> and{" "}
+              <a href="https://x.com/isawamman" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Amman</a>
+            </p>
+          </div>
         </footer>
       </div>
       <Toaster />
