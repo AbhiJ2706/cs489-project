@@ -34,8 +34,14 @@ from scipy.signal import butter, filtfilt, find_peaks
 
 
 from music21 import environment
-environment.set(
-    'musicxmlPath', '/Applications/MuseScore 4.app/Contents/MacOS/mscore')
+# Check for Docker environment and use the appropriate MuseScore path
+import os
+if os.path.exists('/usr/local/bin/mscore'):
+    # Docker path (Linux)
+    environment.set('musicxmlPath', '/usr/local/bin/mscore')
+else:
+    # macOS path (local development)
+    environment.set('musicxmlPath', '/Applications/MuseScore 4.app/Contents/MacOS/mscore')
 
 
 warnings.filterwarnings("ignore", message="PySoundFile failed.*")
