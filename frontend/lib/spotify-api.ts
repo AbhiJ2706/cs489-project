@@ -3,7 +3,7 @@
 export async function redirectToAuthCodeFlow(clientId: string) {
   // Log when this function is called
   console.log("→ Starting Spotify auth flow");
-  
+
   const verifier = generateCodeVerifier(128);
   const challenge = await generateCodeChallenge(verifier);
 
@@ -126,40 +126,31 @@ async function generateCodeChallenge(codeVerifier: string) {
 // Helper function to get the correct redirect URI based on environment
 function getRedirectUri(): string {
   console.log("→ getRedirectUri called");
-  
+
   // Check if we're in a browser environment
   if (typeof window !== "undefined") {
     const { hostname, protocol, host } = window.location;
     console.log("→ Current hostname:", hostname);
-    console.log("→ Window location:", { 
-      protocol, 
-      hostname, 
+    console.log("→ Window location:", {
+      protocol,
+      hostname,
       host,
       fullLocation: window.location.toString(),
-      href: window.location.href
+      href: window.location.href,
     });
 
-    // Map of known hostnames to their registered redirect URIs
-    const knownRedirects: Record<string, string> = {
-      "visualize.music": "https://visualize.music/callback",
-    };
-    console.log("→ Known redirects:", knownRedirects);
-
-    // Return the known redirect if we have one registered
-    if (hostname in knownRedirects) {
-      const redirect = knownRedirects[hostname];
-      console.log("→ Matched hostname! Using redirect URI:", redirect);
-      return redirect;
-    } else {
-      console.log("→ Hostname not in known redirects map:", hostname);
+    // Direct approach - check if it's a visualize.music domain (with or without www)
+    if (hostname.includes("visualize.music")) {
+      console.log("→ visualize.music domain detected");
+      return "https://visualize.music/callback";
     }
 
-    // For localhost development
+    // Localhost development
     if (hostname === "localhost") {
       console.log("→ Localhost detected, using localhost redirect");
       return "http://localhost:3000/callback";
     }
-    
+
     console.log("→ No specific redirect rule matched for hostname:", hostname);
   } else {
     console.log("→ Window is undefined (likely server-side rendering)");
@@ -167,7 +158,7 @@ function getRedirectUri(): string {
 
   // Fallback, though this is likely to cause an error if it doesn't match what's registered
   console.log("→ Using fallback redirect URI");
-  return "http://localhost:3000/callback";
+  return "https://visualize.music/callback";
 }
 
 // Define TypeScript types for Spotify responses
