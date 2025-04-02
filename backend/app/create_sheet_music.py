@@ -97,6 +97,10 @@ def __closest(d):
     return TIME_TO_REST[min(TIME_TO_REST, key=lambda x: abs(d - x))]
 
 
+def __approximate(d):
+    return round(2048 * d) / 2048
+
+
 def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
     try:
         tp = tp[0]
@@ -263,7 +267,9 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
     score.append(treble_part)
     score.append(bass_part)
 
-    return combine_rests_in_score(score), treble_note_list, bass_note_list
+    # new_score, = combine_rests_in_score(score).flatten().splitAtDurations()
+
+    return score, treble_note_list, bass_note_list
 
 
 def __item_to_pitch(item):
@@ -288,7 +294,7 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, trebl
                         m.append(n)
                 part.append(m)
 
-        score.write(fmt='musicxml', fp=output_xml)
+        score.write(fmt='musicxml', fp=output_xml, makeNotation=True)
         score.write('midi', fp=output_xml.replace("xml", "mid"))
         print(f"MusicXML file saved as: {output_xml}")
 
