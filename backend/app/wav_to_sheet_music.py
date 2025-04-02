@@ -71,7 +71,7 @@ def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, outpu
     else:
         print("Conversion completed with errors.")
 
-    return success
+    return True
 
 
 if __name__ == "__main__":

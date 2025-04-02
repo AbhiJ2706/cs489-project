@@ -6,9 +6,13 @@ import logging
 import librosa
 import librosa.display
 from music21 import (clef, duration, instrument, metadata,
-                     meter, note, stream, tempo, tie)
+                     meter, note, stream, tempo, tie, converter)
 
 from .utils import setup_musescore_path
+from music21 import environment
+import numpy as np
+environment.set(
+    'musicxmlPath', '/Applications/MuseScore 4.app/Contents/MacOS/mscore')
 
 # Initialize MuseScore path
 setup_musescore_path()
@@ -45,43 +49,107 @@ def __convert_to_time(note_duration):
     return min(TIME_TO_REST, key=lambda x: (note_duration - x) ** 2)
 
 
+def transform_nested_lists(list16, list8, list4, list2, list1):
+    output_list = []
+    i = 0
+
+    while i < 16:
+        is_current_true = list16[i][0]
+
+        if is_current_true:
+            output_list.append([True])
+            i += 1
+            continue
+
+        idx_list1 = i // 16
+        if i % 16 == 0 and all(not x for x in list1[idx_list1]):
+            output_list.append([False] * 16)
+            i += 16
+            continue
+
+        idx_list2 = i // 8
+        if i % 8 == 0 and all(not x for x in list2[idx_list2]):
+            output_list.append([False] * 8)
+            i += 8
+            continue
+
+        idx_list4 = i // 4
+        if i % 4 == 0 and all(not x for x in list4[idx_list4]):
+            output_list.append([False] * 4)
+            i += 4
+            continue
+
+        idx_list8 = i // 2
+        if i % 2 == 0 and all(not x for x in list8[idx_list8]):
+            output_list.append([False, False])
+            i += 2
+            continue
+
+        output_list.append([False])
+        i += 1
+        continue
+
+    final_element_count = sum(len(sublist) for sublist in output_list)
+    if final_element_count != 16:
+        raise ValueError(f"Internal logic error: Final output covers {final_element_count} elements, expected 16.")
+
+    return output_list
+
+
 def combine_rests_in_measure(measure):
     new_measure = stream.Measure(number=measure.number)
 
-    # Preserve initial time signature if present
     for ts in measure.getElementsByClass(meter.TimeSignature):
         new_measure.append(ts)
 
-    combined_rest = None  # Stores ongoing rest
+    note_mask = []
     for elem in measure.notesAndRests:
-        if isinstance(elem, note.Rest):
-            if combined_rest:
-                combined_rest.quarterLength += elem.quarterLength  # Merge durations
-            else:
-                combined_rest = note.Rest(
-                    quarterLength=elem.quarterLength)  # Start new rest
-        else:
-            if combined_rest:
-                new_measure.append(combined_rest)  # Append merged rest
-                combined_rest = None  # Reset
-            new_measure.append(elem)  # Append non-rest element
+        note_mask += ([[isinstance(elem, note.Note)]] * int(elem.quarterLength // 0.25))
 
-    if combined_rest:
-        new_measure.append(combined_rest)  # Append any remaining rest
+    new_note_mask = note_mask
+    note_masks = [note_mask]
+
+    for interval in [0.5, 1, 2, 4]:
+        nnm = []
+        for i in range(0, int(8 / interval), 2):
+            mask = [y for x in new_note_mask[i:i + 2] for y in x]
+            nnm += [mask]
+        note_masks.append(nnm)
+        new_note_mask = nnm
+    
+    tf = transform_nested_lists(*note_masks)
+
+    locations = {}
+    time = 0
+    for elem in measure.notesAndRests:
+        if isinstance(elem, note.Note):
+            locations[time] = elem
+        time += elem.quarterLength
+    
+    time = 0
+    for elem in tf:
+        if locations.get(time):
+            new_measure.append(locations[time])
+            time += locations[time].quarterLength
+        if not any(elem):
+            combined_rest = note.Rest(quarterLength=0.25 * len(elem))
+            new_measure.append(combined_rest)
+            time += 0.25 * len(elem)
 
     return new_measure
 
 
-def combine_rests_in_part(part):
+def combine_rests_in_part(part, i):
     new_part = stream.Part()
 
     instrs = part.getElementsByClass(instrument.Instrument)
     if instrs:
         new_part.append(instrs[0])
 
-    clefs = part.getElementsByClass(clef.Clef)
-    if clefs:
-        new_part.append(clefs[0])
+    if i == 0:
+        new_part.append(clef.TrebleClef())
+    else:
+        new_part.append(clef.BassClef())
 
     for measure in part.getElementsByClass(stream.Measure):
         new_part.append(combine_rests_in_measure(measure))
@@ -93,8 +161,8 @@ def combine_rests_in_score(score):
     new_score = stream.Score()
     new_score.metadata = metadata.Metadata()
     new_score.metadata.title = score.metadata.title
-    for part in score.getElementsByClass(stream.Part):
-        new_score.append(combine_rests_in_part(part))
+    for i, part in enumerate(score.getElementsByClass(stream.Part)):
+        new_score.append(combine_rests_in_part(part, i))
     return new_score
 
 
@@ -141,10 +209,6 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
         all_notes = sorted(
             midi_data.instruments[0].notes, key=lambda x: x.start)
 
-        measure_count = 1
-        current_treble_measure = stream.Measure(number=measure_count)
-        current_bass_measure = stream.Measure(number=measure_count)
-
         bar_time = 0
         notes_by_time = {}
 
@@ -186,95 +250,25 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
                         bar_time += 4.0
                         r = note.Rest('whole')
 
-                    if bar_time == 4.0:
-                        if n.pitch.midi >= 60:
-                            current_treble_measure.append(n)
-                            current_bass_measure.append(r)
-                            treble_note_list.append(n)
-                        else:
-                            current_treble_measure.append(r)
-                            current_bass_measure.append(n)
-                            bass_note_list.append(n)
-                        treble_part.append(current_treble_measure)
-                        bass_part.append(current_bass_measure)
-
-                        measure_count += 1
-                        current_treble_measure = stream.Measure(
-                            number=measure_count)
-                        current_bass_measure = stream.Measure(
-                            number=measure_count)
-                        bar_time = 0.0
-
-                    elif bar_time > 4.0:
-                        extraneous_time = bar_time - 4
-                        n = note.Note(n.pitch)
-                        n.tie = tie.Tie('start')
-                        r = note.Rest()
-                        n.duration = duration.Duration(type=__closest(
-                            n.duration.quarterLength - extraneous_time), quarterLength=n.duration.quarterLength - extraneous_time)
-                        r.duration = duration.Duration(type=__closest(
-                            n.duration.quarterLength - extraneous_time), quarterLength=n.duration.quarterLength - extraneous_time)
-                        if n.pitch.midi >= 60:
-                            current_treble_measure.append(n)
-                            current_bass_measure.append(r)
-                            treble_note_list.append(n)
-                        else:
-                            current_treble_measure.append(r)
-                            current_bass_measure.append(n)
-                            bass_note_list.append(n)
-                        treble_part.append(current_treble_measure)
-                        bass_part.append(current_bass_measure)
-
-                        measure_count += 1
-                        current_treble_measure = stream.Measure(
-                            number=measure_count)
-                        current_bass_measure = stream.Measure(
-                            number=measure_count)
-
-                        n2 = note.Note(n.pitch)
-                        n2.tie = tie.Tie('stop')
-                        r2 = note.Rest()
-                        n2.duration = duration.Duration(type=__closest(
-                            extraneous_time), quarterLength=extraneous_time)
-                        r2.duration = duration.Duration(type=__closest(
-                            extraneous_time), quarterLength=extraneous_time)
-                        if n.pitch.midi >= 60:
-                            current_treble_measure.append(n2)
-                            current_bass_measure.append(r2)
-                            treble_note_list.append(n2)
-                        else:
-                            current_treble_measure.append(r2)
-                            current_bass_measure.append(n2)
-                            bass_note_list.append(n2)
-                        bar_time = extraneous_time
-
+                    if n.pitch.midi >= 60:
+                        treble_part.append(n)
+                        bass_part.append(r)
+                        treble_note_list.append(n)
                     else:
-                        if n.pitch.midi >= 60:
-                            current_treble_measure.append(n)
-                            current_bass_measure.append(r)
-                            treble_note_list.append(n)
-                        else:
-                            current_treble_measure.append(r)
-                            current_bass_measure.append(n)
-                            bass_note_list.append(n)
+                        treble_part.append(r)
+                        bass_part.append(n)
+                        bass_note_list.append(n)
 
     else:
         placeholder = note.Rest()
         placeholder.duration = duration.Duration(type='whole')
-        current_treble_measure.append(placeholder)
-        current_bass_measure.append(placeholder)
-        treble_part.append(current_treble_measure)
-        bass_part.append(current_bass_measure)
-        measure_count += 1
-        current_treble_measure = stream.Measure(number=measure_count)
-        current_bass_measure = stream.Measure(number=measure_count)
-
+        treble_part.append(placeholder)
+        bass_part.append(placeholder)
+        
     score.append(treble_part)
     score.append(bass_part)
 
-    # new_score, = combine_rests_in_score(score).flatten().splitAtDurations()
-
-    return score, treble_note_list, bass_note_list
+    return score.makeMeasures(), treble_note_list, bass_note_list
 
 
 def __item_to_pitch(item):
@@ -301,36 +295,11 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, trebl
 
         score.write(fmt='musicxml', fp=output_xml, makeNotation=True)
         score.write('midi', fp=output_xml.replace("xml", "mid"))
+        xml_data = converter.parse(output_xml)
+        score = combine_rests_in_score(xml_data)
+        score.write(fmt='musicxml', fp=output_xml)
+
         print(f"MusicXML file saved as: {output_xml}")
-
-        tree = ET.parse(output_xml)
-        root = tree.getroot()
-
-        note_list_counter = 0
-        note_lists = [treble_note_list, bass_note_list]
-
-        for child in root:
-            if child.tag == "part":
-                note_index = 0
-                note_list = note_lists[note_list_counter]
-                for measure in child:
-                    removal = []
-                    for n in measure:
-                        if n.tag == "note":
-                            for pitch in n:
-                                if pitch.tag == "pitch":
-                                    if note_index < len(note_list):
-                                        if __item_to_pitch(pitch) == str(note_list[note_index].pitch):
-                                            note_index += 1
-                                        else:
-                                            removal.append(n)
-                                    else:
-                                        removal.append(n)
-                    for r in removal:
-                        measure.remove(r)
-                note_list_counter += 1
-
-        tree.write(output_xml)
 
         if output_pdf:
             try:
@@ -357,3 +326,14 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, trebl
         print(f"Error generating sheet music: {e}")
         print(f"Error details:\n{error_details}")
         return False
+
+
+if __name__ == "__main__":
+    xml_data = converter.parse("out/trial_blue/output1.xml")
+    combine_rests_in_score(xml_data).write(fmt='musicxml', fp="temp.xml")
+    subprocess.run(
+        ["mscore", "-o", "temp.pdf", "temp.xml"],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
