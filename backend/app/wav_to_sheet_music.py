@@ -7,11 +7,11 @@ import warnings
 import librosa
 import librosa.display
 
-from .utils import setup_musescore_path
-from .create_sheet_music import generate_sheet_music, midi_to_musicxml
-from .load_audio import load_audio_with_fallback
-from .process_audio import detect_notes_and_chords, preprocess_audio
-from .visualize import visualize_audio
+from utils import setup_musescore_path
+from create_sheet_music import generate_sheet_music, midi_to_musicxml
+from load_audio import load_audio_with_fallback
+from process_audio import detect_notes_and_chords, preprocess_audio
+from visualize import visualize_audio
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -53,12 +53,11 @@ def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, outpu
     midi_data = detect_notes_and_chords(preprocessed_audio, sample_rate)
 
     print("Converting to MusicXML...")
-    score, treble_note_list, bass_note_list = midi_to_musicxml(
+    score = midi_to_musicxml(
         midi_data, title=title, tp=tempo_value)
 
     print("Generating sheet music...")
-    success = generate_sheet_music(
-        score, output_xml, output_pdf, treble_note_list, bass_note_list)
+    success = generate_sheet_music(score, output_xml, output_pdf)
 
     if visualize:
         print("Generating audio visualization...")

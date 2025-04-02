@@ -8,7 +8,7 @@ import librosa.display
 from music21 import (clef, duration, instrument, metadata,
                      meter, note, stream, tempo, tie, converter)
 
-from .utils import setup_musescore_path
+from utils import setup_musescore_path
 from music21 import environment
 import numpy as np
 environment.set(
@@ -34,6 +34,7 @@ MIDI_MAX = librosa.note_to_midi('C8')
 
 ONSET_STRENGTH_THRESHOLD = 0.85
 SILENCE_THRESHOLD = 0.007
+REST_GAP_THRESHOLD = 0.375
 NOTE_NOISE_FLOOR_MULTIPLIER = 2
 
 TIME_TO_REST = {
@@ -170,10 +171,6 @@ def __closest(d):
     return TIME_TO_REST[min(TIME_TO_REST, key=lambda x: abs(d - x))]
 
 
-def __approximate(d):
-    return round(2048 * d) / 2048
-
-
 def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
     try:
         tp = tp[0]
@@ -202,14 +199,10 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
     treble_part.append(tempo.MetronomeMark(number=float(tp)))
     bass_part.append(tempo.MetronomeMark(number=float(tp)))
 
-    treble_note_list = []
-    bass_note_list = []
-
     if midi_data.instruments and midi_data.instruments[0].notes:
         all_notes = sorted(
             midi_data.instruments[0].notes, key=lambda x: x.start)
 
-        bar_time = 0
         notes_by_time = {}
 
         for midi_note in all_notes:
@@ -220,6 +213,8 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
 
         time_points = sorted(notes_by_time.keys())
 
+        current_end_time = -1
+
         for time_point in time_points:
             notes_at_time = notes_by_time[time_point]
 
@@ -229,35 +224,38 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
                         (note_obj.end - note_obj.start) / (1 / (tp / 4) * 15))
                     n = note.Note(note_obj.pitch)
 
+                    if current_end_time == -1:
+                        current_end_time = note_obj.end
+                    else:
+                        gap = __convert_to_time((note_obj.start - current_end_time) / (1 / (tp / 4) * 15))
+                        if gap >= REST_GAP_THRESHOLD:
+                            r = note.Rest(__closest(gap))
+                            treble_part.append(r)
+                            bass_part.append(r)
+                        current_end_time = note_obj.end
+
                     if note_duration <= 0.25:
                         n.duration = duration.Duration(type='16th')
-                        bar_time += 0.25
                         r = note.Rest('16th')
                     elif note_duration <= 0.5:
                         n.duration = duration.Duration(type='eighth')
-                        bar_time += 0.5
                         r = note.Rest('eighth')
                     elif note_duration <= 1.0:
                         n.duration = duration.Duration(type='quarter')
-                        bar_time += 1.0
                         r = note.Rest('quarter')
                     elif note_duration <= 2.0:
                         n.duration = duration.Duration(type='half')
-                        bar_time += 2.0
                         r = note.Rest('half')
                     else:
                         n.duration = duration.Duration(type='whole')
-                        bar_time += 4.0
                         r = note.Rest('whole')
 
                     if n.pitch.midi >= 60:
                         treble_part.append(n)
                         bass_part.append(r)
-                        treble_note_list.append(n)
                     else:
                         treble_part.append(r)
                         bass_part.append(n)
-                        bass_note_list.append(n)
 
     else:
         placeholder = note.Rest()
@@ -268,14 +266,10 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
     score.append(treble_part)
     score.append(bass_part)
 
-    return score.makeMeasures(), treble_note_list, bass_note_list
+    return score.makeMeasures()
 
 
-def __item_to_pitch(item):
-    return item.find("step").text + ["", "#", "-"][int(item.find("alter").text)] + item.find("octave").text
-
-
-def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, treble_note_list: list[note.Note] = [], bass_note_list: list[note.Note] = []):
+def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None):
     try:
         output_dir = os.path.dirname(output_xml)
         if output_dir and not os.path.exists(output_dir):
