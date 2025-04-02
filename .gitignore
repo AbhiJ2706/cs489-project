@@ -3,8 +3,11 @@
 *.png
 *.wav
 *.midi
+*.xml
 *.mid
 *.DS_Store
+out/
+separated/
 !test-input-10sec.wav
 # Soundfont files
 *.sf2
