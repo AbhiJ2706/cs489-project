@@ -1,6 +1,6 @@
 // Spotify API utility functions
 
-export async function redirectToAuthCodeFlow(clientId: string) {
+export async function redirectToAuthCodeFlow(clientId: string): Promise<void> {
   // Log when this function is called
   console.log("→ Starting Spotify auth flow");
 
@@ -10,19 +10,11 @@ export async function redirectToAuthCodeFlow(clientId: string) {
   // Store the code verifier in localStorage
   localStorage.setItem("verifier", verifier);
 
-  // Get redirect URI with detailed logging
-  const redirectUri = getRedirectUri();
-  console.log("→ Using redirect URI:", redirectUri);
-
-  // Generate and log the full authorization URL
   const params = new URLSearchParams();
   params.append("client_id", clientId);
   params.append("response_type", "code");
-  params.append("redirect_uri", redirectUri);
-  params.append(
-    "scope",
-    "user-read-private user-read-email playlist-read-private playlist-read-collaborative user-read-recently-played"
-  );
+  params.append("redirect_uri", window.location.origin + "/callback");
+  params.append("scope", "user-read-private user-read-email playlist-read-private playlist-read-collaborative user-read-recently-played user-top-read");
   params.append("code_challenge_method", "S256");
   params.append("code_challenge", challenge);
 
@@ -101,6 +93,38 @@ export async function fetchRecentlyPlayed() {
 
   const data = await response.json();
   return data.items;
+}
+
+type ItemType = "artists" | "tracks";
+type TimeRange = "short_term" | "medium_term" | "long_term";
+
+export async function fetchTopItems(
+  type: ItemType = "tracks", 
+  timeRange: TimeRange = "medium_term", 
+  limit: number = 10,
+  offset: number = 0
+) {
+  const accessToken = localStorage.getItem("accessToken");
+
+  if (!accessToken) {
+    throw new Error("No access token found");
+  }
+
+  const url = new URL(`https://api.spotify.com/v1/me/top/${type}`);
+  url.searchParams.append("time_range", timeRange);
+  url.searchParams.append("limit", limit.toString());
+  url.searchParams.append("offset", offset.toString());
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch top ${type}: ${response.statusText}`);
+  }
+
+  return await response.json();
 }
 
 // Helper functions for PKCE auth

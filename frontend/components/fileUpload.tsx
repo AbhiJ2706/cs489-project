@@ -8,12 +8,12 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Music, Upload, AlertCircle, Youtube, Music2, Link, Clock, User } from "lucide-react";
+import { Music, Upload, AlertCircle, Youtube, Music2, Link, Clock, User, TrendingUp } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import { redirectToAuthCodeFlow, fetchProfile, fetchRecentlyPlayed } from '@/lib/spotify-api';
+import { redirectToAuthCodeFlow, fetchProfile, fetchRecentlyPlayed, fetchTopItems } from '@/lib/spotify-api';
 
 // Import ReactPlayer dynamically to avoid SSR issues
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
@@ -23,7 +23,7 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
 interface FileUploadProps {
   onFileSelect: (file: File) => void;
-  onUrlSubmit?: (url: string, maxDuration: number) => void;
+  onUrlSubmit?: (url: string, maxDuration: number, selectedTrack?: any) => void;
 }
 
 export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
@@ -33,6 +33,7 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const urlInputRef = useRef<HTMLInputElement>(null);
   
   // URL related state
   const [url, setUrl] = useState<string>("");
@@ -45,6 +46,7 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
   // Spotify profile data
   const [profileData, setProfileData] = useState<any>(null);
   const [recentlyPlayed, setRecentlyPlayed] = useState<any[]>([]);
+  const [topTracks, setTopTracks] = useState<any[]>([]);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   
   // Duration setting
@@ -61,13 +63,16 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
       
       const recentTracks = await fetchRecentlyPlayed();
       setRecentlyPlayed(recentTracks);
+      
+      const topTracksData = await fetchTopItems("tracks", "short_term", 5);
+      setTopTracks(topTracksData.items);
     } catch (error) {
       console.error('Error fetching Spotify data:', error);
       setUrlError('Failed to load Spotify data. Please try reconnecting.');
     } finally {
       setIsLoadingProfile(false);
     }
-  }, [isAuthenticatedWithSpotify, setUrlError, setProfileData, setRecentlyPlayed, setIsLoadingProfile]);
+  }, [isAuthenticatedWithSpotify, setUrlError, setProfileData, setRecentlyPlayed, setTopTracks, setIsLoadingProfile]);
 
   useEffect(() => {
     const accessToken = localStorage.getItem('accessToken');
@@ -167,55 +172,110 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
     fileInputRef.current?.click();
   };
 
-  // Detect URL type and validate it
-  const validateUrl = (inputUrl: string) => {
-    // YouTube URL validation
-    const youtubeRegex = /^(https?:\/\/)?(www\.)?(music\.youtube\.com|youtube\.com|youtu\.be)\/.+$/;
-    if (youtubeRegex.test(inputUrl)) {
-      setUrlType("youtube");
-      return true;
-    }
-    
-    // Spotify URL validation
-    const spotifyRegex = /^(https?:\/\/)?(open\.spotify\.com\/track\/|spotify:track:)[a-zA-Z0-9]+(\?.*)?$/;
-    if (spotifyRegex.test(inputUrl)) {
-      setUrlType("spotify");
-      return true;
-    }
-    
-    setUrlType(null);
-    return false;
-  };
-
-  // Handle URL change
+  // Handle URL input change
   const handleUrlChange = (e: ChangeEvent<HTMLInputElement>) => {
     const inputUrl = e.target.value;
     setUrl(inputUrl);
-    setIsValidUrl(validateUrl(inputUrl));
+    
+    // Clear previous errors
     setUrlError(null);
+    
+    // Detect URL type
+    if (inputUrl.includes("youtube.com") || inputUrl.includes("youtu.be")) {
+      setUrlType("youtube");
+      setIsValidUrl(isValidYouTubeUrl(inputUrl));
+    } else if (inputUrl.includes("spotify.com/track/") || inputUrl.startsWith("spotify:track:")) {
+      setUrlType("spotify");
+      setIsValidUrl(isValidSpotifyUrl(inputUrl));
+    } else {
+      setUrlType(null);
+      setIsValidUrl(false);
+    }
   };
 
-  // Handle URL submit
-  const handleUrlSubmit = async () => {
-    if (!isValidUrl) {
+  // Handle URL form submission
+  const submitUrl = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!url) {
+      setUrlError("Please enter a URL");
+      return;
+    }
+    
+    // Validate the URL format
+    if (urlType === "youtube") {
+      // YouTube URL validation
+      if (!isValidYouTubeUrl(url)) {
+        setUrlError("Please enter a valid YouTube URL");
+        return;
+      }
+    } else if (urlType === "spotify") {
+      // Spotify URL validation
+      if (!isValidSpotifyUrl(url)) {
+        setUrlError("Please enter a valid Spotify track URL");
+        return;
+      }
+    } else {
+      // No valid URL type detected
       setUrlError("Please enter a valid YouTube or Spotify URL");
       return;
     }
     
-    setIsProcessingUrl(true);
+    // Clear any previous errors
     setUrlError(null);
+    
+    // Set processing state
+    setIsProcessingUrl(true);
     
     try {
       if (onUrlSubmit) {
-        // Pass both URL and duration to the parent component
-        onUrlSubmit(url, maxDuration);
+        // Pass the URL and max duration to the parent component
+        await onUrlSubmit(url, maxDuration);
       }
     } catch (error) {
-      setUrlError("Failed to process URL. Please try again.");
-      console.error("URL processing error:", error);
+      console.error("Error submitting URL:", error);
+      setUrlError("Failed to process the URL. Please try again.");
     } finally {
       setIsProcessingUrl(false);
     }
+  };
+
+  // Helper function to validate YouTube URL
+  const isValidYouTubeUrl = (url: string) => {
+    return url.includes("youtube.com/watch") || 
+           url.includes("youtu.be/") || 
+           url.includes("youtube.com/shorts/");
+  };
+  
+  // Helper function to validate Spotify URL
+  const isValidSpotifyUrl = (url: string) => {
+    return url.includes("spotify.com/track/") || 
+           url.startsWith("spotify:track:");
+  };
+
+  const handleTrackSelect = (trackUri: string) => {
+    // Convert Spotify URI to URL format if needed
+    // spotify:track:1234567 => https://open.spotify.com/track/1234567
+    let trackUrl = trackUri;
+    if (trackUri.startsWith("spotify:track:")) {
+      const trackId = trackUri.split(":")[2];
+      trackUrl = `https://open.spotify.com/track/${trackId}`;
+    }
+    
+    // Update the URL state directly
+    setUrl(trackUrl);
+    
+    // Also update the input field value
+    if (urlInputRef.current) {
+      urlInputRef.current.value = trackUrl;
+    }
+    
+    // Set the URL type for validation
+    setUrlType("spotify");
+    setIsValidUrl(true);
+    
+    // Clear any previous errors
+    setUrlError(null);
   };
 
   return (
@@ -308,6 +368,7 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
                   onChange={handleUrlChange}
                   className="w-full"
                   disabled={isProcessingUrl}
+                  ref={urlInputRef}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   Supports YouTube and Spotify track URLs
@@ -434,13 +495,18 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
                   </div>
                   
                   {recentlyPlayed && recentlyPlayed.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
-                        <Clock className="h-3 w-3" /> Recently Played Tracks
-                      </h4>
+                    <div className="pt-2">
+                      <div className="flex items-center gap-1.5 text-sm font-medium text-green-700 mb-1.5">
+                        <Clock className="h-4 w-4" />
+                        <span>Recently Played</span>
+                      </div>
                       <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
                         {recentlyPlayed.slice(0, 5).map((item: any) => (
-                          <div key={item.played_at} className="flex items-center gap-2 p-2 rounded hover:bg-green-500/10">
+                          <div 
+                            key={item.played_at} 
+                            className="flex items-center gap-2 p-2 rounded hover:bg-green-500/10 cursor-pointer"
+                            onClick={() => handleTrackSelect(item.track.uri)}
+                          >
                             <div className="h-8 w-8 flex-shrink-0 relative">
                               {item.track.album.images && item.track.album.images[0] && (
                                 <Image 
@@ -453,10 +519,46 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium truncate">{item.track.name}</p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {item.track.artists.map((a: any) => a.name).join(', ')}
-                              </p>
+                              <div className="text-sm font-medium truncate">{item.track.name}</div>
+                              <div className="text-xs text-gray-500 truncate">
+                                {item.track.artists.map((artist: any) => artist.name).join(", ")}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {topTracks && topTracks.length > 0 && (
+                    <div className="pt-4">
+                      <div className="flex items-center gap-1.5 text-sm font-medium text-green-700 mb-1.5">
+                        <TrendingUp className="h-4 w-4" />
+                        <span>Your Top Tracks</span>
+                      </div>
+                      <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                        {topTracks.map((track: any) => (
+                          <div 
+                            key={track.id} 
+                            className="flex items-center gap-2 p-2 rounded hover:bg-green-500/10 cursor-pointer"
+                            onClick={() => handleTrackSelect(track.uri)}
+                          >
+                            <div className="h-8 w-8 flex-shrink-0 relative">
+                              {track.album.images && track.album.images[0] && (
+                                <Image 
+                                  src={track.album.images[0].url} 
+                                  alt={track.album.name}
+                                  width={32}
+                                  height={32}
+                                  className="object-cover rounded"
+                                />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate">{track.name}</div>
+                              <div className="text-xs text-gray-500 truncate">
+                                {track.artists.map((artist: any) => artist.name).join(", ")}
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -481,13 +583,15 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
                 </Alert>
               )}
               
-              <Button 
-                onClick={handleUrlSubmit} 
-                className="w-full"
-                disabled={!isValidUrl || isProcessingUrl}
-              >
-                {isProcessingUrl ? "Processing..." : "Convert to Sheet Music"}
-              </Button>
+              <form onSubmit={submitUrl}>
+                <Button 
+                  type="submit"
+                  className="w-full"
+                  disabled={!isValidUrl || isProcessingUrl}
+                >
+                  {isProcessingUrl ? "Processing..." : "Convert to Sheet Music"}
+                </Button>
+              </form>
             </div>
           </TabsContent>
         </Tabs>
