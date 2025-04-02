@@ -6,8 +6,8 @@
 *.xml
 *.mid
 *.DS_Store
-out/
-separated/
+backend/out/
+backend/separated/
 !test-input-10sec.wav
 # Soundfont files
 *.sf2
