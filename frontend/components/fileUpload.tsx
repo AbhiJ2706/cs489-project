@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, ChangeEvent, useEffect } from "react";
+import { useState, useRef, ChangeEvent, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,11 +8,12 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Music, Upload, AlertCircle, Youtube, Music2, Link, Clock } from "lucide-react";
+import { Music, Upload, AlertCircle, Youtube, Music2, Link, Clock, User } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import dynamic from "next/dynamic";
-import { redirectToAuthCodeFlow } from '@/lib/spotify-api';
+import Image from "next/image";
+import { redirectToAuthCodeFlow, fetchProfile, fetchRecentlyPlayed } from '@/lib/spotify-api';
 
 // Import ReactPlayer dynamically to avoid SSR issues
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
@@ -41,9 +42,33 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
   const [urlType, setUrlType] = useState<"youtube" | "spotify" | null>(null);
   const [isAuthenticatedWithSpotify, setIsAuthenticatedWithSpotify] = useState(false);
   
+  // Spotify profile data
+  const [profileData, setProfileData] = useState<any>(null);
+  const [recentlyPlayed, setRecentlyPlayed] = useState<any[]>([]);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  
   // Duration setting
   const [maxDuration, setMaxDuration] = useState<number>(20);
   
+  // Function to load Spotify profile data and recently played tracks
+  const loadSpotifyData = useCallback(async () => {
+    if (!isAuthenticatedWithSpotify) return;
+    
+    setIsLoadingProfile(true);
+    try {
+      const profile = await fetchProfile();
+      setProfileData(profile);
+      
+      const recentTracks = await fetchRecentlyPlayed();
+      setRecentlyPlayed(recentTracks);
+    } catch (error) {
+      console.error('Error fetching Spotify data:', error);
+      setUrlError('Failed to load Spotify data. Please try reconnecting.');
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  }, [isAuthenticatedWithSpotify, setUrlError, setProfileData, setRecentlyPlayed, setIsLoadingProfile]);
+
   useEffect(() => {
     const accessToken = localStorage.getItem('accessToken');
     const expiration = localStorage.getItem('accessTokenExpiration');
@@ -51,8 +76,40 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
     if (accessToken && expiration) {
       const isExpired = Number(expiration) < new Date().getTime();
       setIsAuthenticatedWithSpotify(!isExpired);
+      
+      // If authenticated, fetch the profile data
+      if (!isExpired) {
+        loadSpotifyData();
+      }
     }
-  }, []);
+  }, [loadSpotifyData]);
+  
+  // Check for auth code in URL params
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      
+      if (code) {
+        // Exchange the code for an access token
+        import('@/lib/spotify-api').then(({ getAccessToken }) => {
+          getAccessToken(process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || '', code)
+            .then(() => {
+              setIsAuthenticatedWithSpotify(true);
+              // Clear the URL parameters
+              window.history.replaceState({}, document.title, window.location.pathname);
+              // Load the profile data
+              loadSpotifyData();
+              toast.success("Successfully connected to Spotify");
+            })
+            .catch(error => {
+              console.error("Failed to exchange auth code for token:", error);
+              toast.error("Failed to connect to Spotify");
+            });
+        });
+      }
+    }
+  }, [loadSpotifyData]);
 
   const handleSpotifyConnect = async () => {
     try {
@@ -352,6 +409,69 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
                   {isAuthenticatedWithSpotify ? "Reconnect" : "Connect"}
                 </Button>
               </div>
+              
+              {/* Spotify Profile Data */}
+              {isAuthenticatedWithSpotify && profileData && (
+                <div className="mt-4 p-4 border rounded-lg border-green-500/30 bg-green-500/5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="h-12 w-12 rounded-full overflow-hidden bg-green-500/20 flex items-center justify-center">
+                      {profileData.images && profileData.images[0] ? (
+                        <Image 
+                          src={profileData.images[0].url} 
+                          alt={profileData.display_name}
+                          width={48}
+                          height={48}
+                          className="object-cover" 
+                        />
+                      ) : (
+                        <User className="h-6 w-6 text-green-700" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-medium">{profileData.display_name}</h3>
+                      <p className="text-xs text-muted-foreground">{profileData.email}</p>
+                    </div>
+                  </div>
+                  
+                  {recentlyPlayed && recentlyPlayed.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
+                        <Clock className="h-3 w-3" /> Recently Played Tracks
+                      </h4>
+                      <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                        {recentlyPlayed.slice(0, 5).map((item: any) => (
+                          <div key={item.played_at} className="flex items-center gap-2 p-2 rounded hover:bg-green-500/10">
+                            <div className="h-8 w-8 flex-shrink-0 relative">
+                              {item.track.album.images && item.track.album.images[0] && (
+                                <Image 
+                                  src={item.track.album.images[0].url} 
+                                  alt={item.track.album.name}
+                                  width={32}
+                                  height={32}
+                                  className="object-cover rounded"
+                                />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium truncate">{item.track.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {item.track.artists.map((a: any) => a.name).join(', ')}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {isLoadingProfile && (
+                <div className="flex items-center justify-center p-4">
+                  <div className="animate-spin h-5 w-5 border-2 border-green-500 rounded-full border-t-transparent"></div>
+                  <span className="ml-2 text-sm">Loading profile data...</span>
+                </div>
+              )}
               
               {urlError && (
                 <Alert variant="destructive">
