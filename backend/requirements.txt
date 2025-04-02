@@ -110,3 +110,8 @@ yt-dlp==2025.3.31
 ffmpeg-python==0.2.0
 spotdl==4.2.11
 spotipy==2.25.1
+sqlmodel==0.0.24
+psycopg2==2.9.10
+python-jose[cryptography]==3.4.0
+email-validator==2.2.0
+dnspython==2.7.0

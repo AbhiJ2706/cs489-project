@@ -906,15 +906,15 @@ def main():
 
     args = parser.parse_args()
 
-    if not os.path.isdir(f"out/{args.title.replace(" ", "_")}"):
-        os.mkdir(f"out/{args.title.replace(" ", "_")}")
+    if not os.path.isdir(f"out/{args.title.replace(' ', '_')}"):
+        os.mkdir(f"out/{args.title.replace(' ', '_')}")
 
     wav_to_sheet_music(
         args.input_wav,
-        f"out/{args.title.replace(" ", "_")}/{args.output_xml}",
+        f"out/{args.title.replace(' ', '_')}/{args.output_xml}",
         title=args.title,
         visualize=args.visualize,
-        output_pdf=f"out/{args.title.replace(" ", "_")}/{args.output_pdf}"
+        output_pdf=f"out/{args.title.replace(' ', '_')}/{args.output_pdf}"
     )
 
 
