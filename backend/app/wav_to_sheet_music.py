@@ -36,13 +36,35 @@ from scipy.signal import butter, filtfilt, find_peaks
 from music21 import environment
 # Check for Docker environment and use the appropriate MuseScore path
 import os
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 if os.path.exists('/usr/local/bin/mscore'):
     # Docker path (Linux)
-    environment.set('musicxmlPath', '/usr/local/bin/mscore')
+    mscore_path = '/usr/local/bin/mscore'
+    environment.set('musicxmlPath', mscore_path)
+    logger.info(f"Using Docker MuseScore path: {mscore_path}")
+    # Verify if executable
+    is_executable = os.access(mscore_path, os.X_OK)
+    logger.info(f"Is mscore executable: {is_executable}")
+    # Try to run mscore --version to verify installation
+    try:
+        import subprocess
+        result = subprocess.run([mscore_path, '--version'], capture_output=True, text=True)
+        logger.info(f"MuseScore version check: {result.stdout.strip() if result.returncode == 0 else f'Failed with return code {result.returncode}: {result.stderr}'}")
+    except Exception as e:
+        logger.error(f"Error checking MuseScore version: {str(e)}")
 else:
     # macOS path (local development)
-    environment.set('musicxmlPath', '/Applications/MuseScore 4.app/Contents/MacOS/mscore')
-
+    mscore_path = '/Applications/MuseScore 4.app/Contents/MacOS/mscore'
+    environment.set('musicxmlPath', mscore_path)
+    logger.info(f"Using macOS MuseScore path: {mscore_path}")
+    # Verify if the path exists
+    path_exists = os.path.exists(mscore_path)
+    logger.info(f"MuseScore path exists: {path_exists}")
 
 warnings.filterwarnings("ignore", message="PySoundFile failed.*")
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -522,15 +544,61 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, trebl
         # If PDF output is requested, try to generate it
         if output_pdf:
             try:
-                # Try to use MuseScore to convert MusicXML to PDF if available
-                subprocess.run(
-                    ["mscore", "-o", output_pdf, output_xml],
+                # Get the path to mscore that we're using
+                mscore_command = mscore_path
+                logger.info(f"Attempting to generate PDF using MuseScore at: {mscore_command}")
+                
+                # Check if the file exists and is executable
+                if not os.path.exists(mscore_command):
+                    logger.error(f"MuseScore executable not found at: {mscore_command}")
+                    raise FileNotFoundError(f"MuseScore executable not found at: {mscore_command}")
+                
+                if not os.access(mscore_command, os.X_OK):
+                    logger.error(f"MuseScore exists but is not executable: {mscore_command}")
+                    raise PermissionError(f"MuseScore exists but is not executable: {mscore_command}")
+                
+                # Check that the output directory exists
+                output_dir = os.path.dirname(output_pdf)
+                if output_dir and not os.path.exists(output_dir):
+                    logger.info(f"Creating output directory: {output_dir}")
+                    os.makedirs(output_dir, exist_ok=True)
+                
+                # Log the command we're about to run
+                cmd = [mscore_command, "-o", output_pdf, output_xml]
+                logger.info(f"Running command: {' '.join(cmd)}")
+                
+                # Try to use MuseScore to convert MusicXML to PDF
+                result = subprocess.run(
+                    cmd,
                     check=True,
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
+                    stderr=subprocess.PIPE,
+                    text=True
                 )
-                print(f"PDF file saved as: {output_pdf}")
-            except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                
+                logger.info(f"MuseScore command completed successfully")
+                if result.stdout:
+                    logger.info(f"MuseScore stdout: {result.stdout}")
+                if result.stderr:
+                    logger.warning(f"MuseScore stderr: {result.stderr}")
+                
+                # Verify the file was actually created
+                if os.path.exists(output_pdf):
+                    logger.info(f"PDF file successfully created: {output_pdf}")
+                    print(f"PDF file saved as: {output_pdf}")
+                else:
+                    logger.error(f"PDF file was not created despite successful command execution: {output_pdf}")
+                    print(f"Warning: PDF file was not created despite successful command execution: {output_pdf}")
+                    return False
+                
+            except (subprocess.CalledProcessError, FileNotFoundError, PermissionError) as e:
+                logger.error(f"Error generating PDF: {str(e)}")
+                
+                if isinstance(e, subprocess.CalledProcessError):
+                    logger.error(f"Command failed with return code {e.returncode}")
+                    logger.error(f"Command stdout: {e.stdout}")
+                    logger.error(f"Command stderr: {e.stderr}")
+                
                 print(f"Warning: Could not generate PDF. Error: {e}")
                 print("MuseScore is not installed or not in PATH.")
                 print(
@@ -538,7 +606,6 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, trebl
                 if output_pdf:
                     print(f"PDF file was not created: {output_pdf}")
                     return False
-
         return True
     except Exception as e:
         import traceback
