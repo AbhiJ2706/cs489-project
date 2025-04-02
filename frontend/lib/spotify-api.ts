@@ -107,13 +107,19 @@ async function generateCodeChallenge(codeVerifier: string) {
 function getRedirectUri(): string {
   // Check if we're in a browser environment
   if (typeof window !== 'undefined') {
-    // In production (visualizer.music domain)
-    if (window.location.hostname === 'visualizer.music') {
-      return 'https://visualizer.music/callback';
+    const { protocol, hostname, port } = window.location;
+    
+    // Production environments
+    if (hostname === 'visualizer.music' || hostname.includes('vercel.app')) {
+      return `${protocol}//${hostname}/callback`;
     }
+    
+    // Development or other environments (use the current hostname)
+    const portSuffix = port ? `:${port}` : '';
+    return `${protocol}//${hostname}${portSuffix}/callback`;
   }
   
-  // Default to localhost for development
+  // Fallback for SSR or if window is undefined (should rarely happen)
   return 'http://localhost:3000/callback';
 }
 
