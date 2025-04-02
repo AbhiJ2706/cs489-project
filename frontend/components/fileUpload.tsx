@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, ChangeEvent } from "react";
+import { useState, useRef, ChangeEvent, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Music, Upload, AlertCircle, Youtube, Music2, Link } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import dynamic from "next/dynamic";
+import { redirectToAuthCodeFlow } from '@/lib/spotify-api';
 
 // Import ReactPlayer dynamically to avoid SSR issues
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
@@ -37,7 +38,28 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
   const [isProcessingUrl, setIsProcessingUrl] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
   const [urlType, setUrlType] = useState<"youtube" | "spotify" | null>(null);
+  const [isAuthenticatedWithSpotify, setIsAuthenticatedWithSpotify] = useState(false);
   
+  useEffect(() => {
+    const accessToken = localStorage.getItem('accessToken');
+    const expiration = localStorage.getItem('accessTokenExpiration');
+    
+    if (accessToken && expiration) {
+      const isExpired = Number(expiration) < new Date().getTime();
+      setIsAuthenticatedWithSpotify(!isExpired);
+    }
+  }, []);
+
+  const handleSpotifyConnect = async () => {
+    try {
+      // Using the client ID from environment variable
+      await redirectToAuthCodeFlow(process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || '');
+    } catch (error) {
+      console.error('Spotify auth error:', error);
+      setUrlError('Failed to connect to Spotify. Please try again.');
+    }
+  };
+
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     setError(null);
     const file = e.target.files?.[0];
@@ -288,15 +310,19 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
                 <Music2 className="h-5 w-5 text-green-500" />
                 <div className="flex-1">
                   <h4 className="text-sm font-medium">Connect Spotify Account</h4>
-                  <p className="text-xs text-muted-foreground">Sign in to access your playlists and favorites</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isAuthenticatedWithSpotify 
+                      ? "You're connected to Spotify" 
+                      : "Sign in to access your playlists and favorites"}
+                  </p>
                 </div>
                 <Button 
                   variant="outline" 
                   size="sm"
                   className="bg-green-500/10 border-green-500/20 hover:bg-green-500/20 text-green-600"
-                  onClick={() => window.open('https://accounts.spotify.com/authorize?client_id=YOUR_CLIENT_ID&response_type=code&redirect_uri=YOUR_REDIRECT_URI&scope=user-read-private%20user-read-email%20playlist-read-private', '_blank')}
+                  onClick={handleSpotifyConnect}
                 >
-                  Connect
+                  {isAuthenticatedWithSpotify ? "Reconnect" : "Connect"}
                 </Button>
               </div>
               
