@@ -48,3 +48,32 @@ def setup_musescore_path():
             logger.error(f"All attempts to set musicxmlPath failed: {str(e2)}")
     
     return mscore_path
+
+def get_youtube_cookies_path():
+    """
+    Get the path for YouTube cookies file.
+    Checks for Docker path first, falls back to local backend directory.
+    Returns the path to the cookies file.
+    """
+    # Docker path
+    docker_path = '/app/backend/youtube-cookies.txt'
+    
+    # Local development path - relative to backend directory
+    import pathlib
+    current_dir = pathlib.Path(__file__).parent.parent  # app/utils.py -> app -> backend
+    local_path = current_dir / 'youtube-cookies.txt'
+    
+    if os.path.exists(docker_path):
+        cookies_path = docker_path
+        logger.info(f"Using Docker YouTube cookies path: {cookies_path}")
+    elif os.path.exists(local_path):
+        cookies_path = str(local_path)
+        logger.info(f"Using local YouTube cookies path: {cookies_path}")
+    else:
+        # If no cookies file exists, log a warning and return the local path anyway
+        # (it will be created or the download will fail with an appropriate error)
+        cookies_path = str(local_path)
+        logger.warning(f"YouTube cookies file not found at {docker_path} or {local_path}")
+        logger.warning("YouTube downloads may fail due to bot protection without a cookies file")
+    
+    return cookies_path

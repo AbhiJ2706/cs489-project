@@ -3,15 +3,16 @@ Online media conversion endpoints (YouTube, Spotify).
 """
 
 import os
+import tempfile
 import shutil
 import subprocess
 import logging
-from pathlib import Path
 import ffmpeg
 import yt_dlp
-from fastapi import APIRouter, HTTPException, Depends, status, Response
-from sqlmodel import Session
+from pathlib import Path
 from typing import Optional
+from sqlmodel import Session
+from fastapi import APIRouter, Depends, HTTPException, Response
 
 from app.models.schemas import ConversionResult, YouTubeUrl, SpotifyUrl, GenericUrl
 from app.models.auth import User
@@ -21,6 +22,7 @@ from app.routers.auth import get_optional_user
 from app.config import TEMP_DIR, SOUNDFONT_PATH
 from app.wav_to_sheet_music import wav_to_sheet_music
 from app.musicxml_to_wav import musicxml_to_wav
+from app.utils import get_youtube_cookies_path
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -63,7 +65,7 @@ async def convert_youtube(
             'noplaylist': True,
             'quiet': True,
             'no_warnings': True,
-            'cookiefile': '/app/backend/youtube-cookies.txt',  # Use cookies file to bypass bot protection
+            'cookiefile': get_youtube_cookies_path(),  # Use cookies file to bypass bot protection
         }
         
         # Variable to store the original audio duration
@@ -241,12 +243,39 @@ async def convert_youtube(
         )
     
     except Exception as e:
+        # Detailed error logging
+        logger.error(f"YouTube conversion failed with error: {str(e)}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        
+        # Log information about the state of files
+        logger.error(f"File status - WAV exists: {wav_path.exists()}, MusicXML exists: {musicxml_path.exists()}, PDF exists: {pdf_path.exists()}")
+        
+        # Additional debugging info if available
+        if wav_path.exists():
+            try:
+                wav_size = wav_path.stat().st_size
+                logger.error(f"WAV file size: {wav_size} bytes")
+                if wav_size == 0:
+                    logger.error("WAV file is empty (0 bytes)")
+            except Exception as file_err:
+                logger.error(f"Error checking WAV file: {str(file_err)}")
+        
         # Clean up any created files
         for path in [wav_path, musicxml_path, pdf_path]:
             if path.exists():
-                path.unlink()
+                try:
+                    path.unlink()
+                    logger.info(f"Cleaned up file: {path}")
+                except Exception as cleanup_err:
+                    logger.error(f"Error cleaning up {path}: {str(cleanup_err)}")
+        
         if temp_dir.exists():
-            shutil.rmtree(temp_dir)
+            try:
+                shutil.rmtree(temp_dir)
+                logger.info(f"Cleaned up temp directory: {temp_dir}")
+            except Exception as cleanup_err:
+                logger.error(f"Error cleaning up temp directory: {str(cleanup_err)}")
         
         raise HTTPException(
             status_code=500,
@@ -314,7 +343,7 @@ async def convert_spotify(
             subprocess.run([
                 'spotdl', 'download', f"https://open.spotify.com/track/{track_id}", 
                 '--output', download_output_path,
-                '--cookie-file', '/app/backend/youtube-cookies.txt'  # Use cookies file to bypass YouTube bot protection
+                '--cookie-file', get_youtube_cookies_path()  # Use cookies file to bypass YouTube bot protection
             ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             
             # Find the downloaded file (should be the only file in the temp directory)
@@ -503,19 +532,41 @@ async def convert_url(
  
     url = url_data.url
     title = url_data.title
+    max_duration = url_data.max_duration
     
-    # Auto-detect URL type
-    if "youtube.com" in url or "youtu.be" in url or "music.youtube.com" in url:
-        # Handle as YouTube URL
-        youtube_data = YouTubeUrl(url=url, title=title, max_duration=url_data.max_duration)
-        return await convert_youtube(youtube_data, current_user, session)
-    elif "spotify.com/track/" in url or "spotify:track:" in url:
-        # Handle as Spotify URL
-        spotify_data = SpotifyUrl(url=url, title=title, max_duration=url_data.max_duration)
-        return await convert_spotify(spotify_data, current_user, session)
-    else:
-        # Unknown URL type
-        raise HTTPException(
-            status_code=400,
-            detail="Unsupported URL format. Please provide a valid YouTube or Spotify URL."
-        )
+    logger.info(f"Processing URL: {url}")
+    logger.info(f"Max duration set to: {max_duration} seconds")
+    
+    try:
+        # Auto-detect URL type
+        if "youtube.com" in url or "youtu.be" in url or "music.youtube.com" in url:
+            # Handle as YouTube URL
+            logger.info(f"Detected YouTube URL, creating YouTubeUrl object with max_duration={max_duration}")
+            youtube_data = YouTubeUrl(url=url, title=title, max_duration=max_duration)
+            return await convert_youtube(youtube_data, current_user, session)
+        elif "spotify.com/track/" in url or "spotify:track:" in url:
+            # Handle as Spotify URL
+            logger.info(f"Detected Spotify URL, creating SpotifyUrl object with max_duration={max_duration}")
+            spotify_data = SpotifyUrl(url=url, title=title, max_duration=max_duration)
+            return await convert_spotify(spotify_data, current_user, session)
+        else:
+            # Unknown URL type
+            logger.error(f"Unsupported URL format: {url}")
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported URL format. Please provide a valid YouTube or Spotify URL."
+            )
+    except Exception as e:
+        # Log detailed error information
+        logger.error(f"Error in convert_url endpoint: {str(e)}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        
+        # Re-raise as HTTP exception with detailed message
+        if isinstance(e, HTTPException):
+            raise e
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"URL conversion failed: {str(e)}"
+            )
