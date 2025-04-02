@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getAccessToken } from '@/lib/spotify-api';
 import { Button } from '@/components/ui/button';
 
-export default function CallbackPage() {
+// Separate client component that uses search params
+function CallbackHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -51,7 +52,7 @@ export default function CallbackPage() {
     <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
       {status === 'loading' && (
         <div className="space-y-4">
-          <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
+          <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mx-auto" />
           <h1 className="text-2xl font-bold">Connecting to Spotify...</h1>
           <p className="text-muted-foreground">Please wait while we complete the authentication</p>
         </div>
@@ -82,5 +83,18 @@ export default function CallbackPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Main component that wraps the CallbackHandler in a Suspense boundary
+export default function CallbackPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    }>
+      <CallbackHandler />
+    </Suspense>
   );
 }
