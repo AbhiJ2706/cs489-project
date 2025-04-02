@@ -30,6 +30,9 @@ RUN apt-get update && apt-get install -y \
     # Dependencies for MuseScore
     xvfb \
     libopengl0 \
+    # Web browsers for cookies
+    firefox-esr \
+    chromium \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Bun

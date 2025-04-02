@@ -58,6 +58,7 @@ async def convert_youtube(
             'noplaylist': True,
             'quiet': True,
             'no_warnings': True,
+            'cookiesfrombrowser': ('firefox', None, None, None),  # Use Firefox cookies to bypass bot protection
         }
         
         # Download audio from YouTube
@@ -274,7 +275,8 @@ async def convert_spotify(
             # Run spotdl command to download the track
             subprocess.run([
                 'spotdl', 'download', f"https://open.spotify.com/track/{track_id}", 
-                '--output', download_output_path
+                '--output', download_output_path,
+                '--cookies-from-browser', 'firefox'  # Use Firefox cookies to bypass YouTube bot protection
             ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             
             # Find the downloaded file (should be the only file in the temp directory)
