@@ -6,6 +6,8 @@ import music21
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import os
+import re
 
 # Import routers
 from app.routers.home import router as home_router
@@ -30,10 +32,15 @@ except:
 # Create FastAPI app
 app = FastAPI(title="DaScore API")
 
+# Get CORS origins from environment or use defaults
+cors_origins_str = os.getenv("CORS_ALLOW_ORIGINS", "https://www.visualize.music,http://localhost:3000,*")
+cors_origins = cors_origins_str.split(",")
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
+    allow_origin_regex=r"https://.*\.ideaflow\.app$",  # Allows any subdomain of ideaflow.app
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

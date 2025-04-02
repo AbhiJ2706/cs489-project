@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 import ffmpeg
 import yt_dlp
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 
 from app.models.schemas import ConversionResult, YouTubeUrl, SpotifyUrl, GenericUrl
 from app.config import TEMP_DIR, SOUNDFONT_PATH
@@ -336,7 +336,7 @@ async def convert_spotify(spotify_data: SpotifyUrl):
         )
 
 @router.post("/convert-url", response_model=ConversionResult)
-async def convert_url(url_data: GenericUrl):
+async def convert_url(url_data: GenericUrl, response: Response):
     """
     Auto-detect URL type (YouTube or Spotify) and process accordingly.
     
@@ -346,6 +346,11 @@ async def convert_url(url_data: GenericUrl):
     Returns:
         ConversionResult: File ID and status message
     """
+    # Add CORS headers explicitly
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    
     url = url_data.url
     title = url_data.title
     

@@ -39,13 +39,31 @@ export const apiFetch = async <T = any>(
   path: string,
   options?: RequestInit
 ): Promise<T> => {
-  const response = await fetch(apiUrl(path), options);
+  // Default fetch options with CORS settings
+  const defaultOptions: RequestInit = {
+    mode: 'cors',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  };
+  
+  // Merge default options with provided options
+  const fetchOptions = {
+    ...defaultOptions,
+    ...options,
+    headers: {
+      ...defaultOptions.headers,
+      ...(options?.headers || {}),
+    },
+  };
+  
+  const response = await fetch(apiUrl(path), fetchOptions);
   
   if (!response.ok) {
     throw new Error(`API error: ${response.status} ${response.statusText}`);
   }
   
-  // For non-JSON responses (like file downloads)
   const contentType = response.headers.get('content-type');
   if (!contentType || !contentType.includes('application/json')) {
     return response as unknown as T;
