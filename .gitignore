@@ -1,23 +1,23 @@
-*.musicxml
-*.pdf
-*.png
+# Ignore large files
 *.wav
-*.midi
-*.xml
-*.mid
-*.DS_Store
-backend/out/
-backend/separated/
-!test-input-10sec.wav
-# Soundfont files
+*.mp3
+*.mp4
+*.webm
 *.sf2
-*.sf3
-*.dls
-# Large files
 FluidR3_GM.sf2
-README.txt
-copyright.txt
-src/cs489_project/__pycache__/
-__pycache__/
+*/node_modules/
+*/.next/
+
+# Ignore backend cookies
+.env 
+README.txt 
+
+backend/.env
+backend/README.txt
+backend/copyright.txt
 harmonic/
-.env
+output.musicxml
+output.pdf
+test.pdf
+__pycache__/
+copyright.txt
