@@ -118,8 +118,13 @@ RUN chmod +x setup.js
 # Expose the port
 EXPOSE 8000
 
-# Set environment variables
-ENV CORS_ALLOW_ORIGINS="https://www.visualize.music,http://localhost:3000,*"
+# Set environment variables and allow them to be overridden at build time
+ARG DATABASE_URL
+ARG CORS_ALLOW_ORIGINS="https://www.visualize.music,http://localhost:3000,*"
+
+# Set environment variables for runtime
+ENV CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS}
+ENV DATABASE_URL=${DATABASE_URL}
 
 # Run setup script and then start the API server
 CMD bun setup.js && uvicorn app.main:app --host 0.0.0.0 --port 8000
