@@ -67,7 +67,23 @@ RUN apt-get update && apt-get install -y \
     libfontconfig1 \
     libxcursor1 \
     libxrandr2 \
+    libxtst6 \
+    libgl1-mesa-glx \
+    libgl1-mesa-dri \
+    mesa-utils \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Check if Xvfb can successfully start
+RUN Xvfb :99 -screen 0 1280x1024x24 -ac +extension GLX +render -noreset & \
+    XVFB_PID=$! && \
+    sleep 2 && \
+    if ps -p $XVFB_PID > /dev/null; then \
+      echo "Xvfb is running properly"; \
+      kill $XVFB_PID; \
+    else \
+      echo "Xvfb failed to start"; \
+      exit 1; \
+    fi
 
 # Install MuseScore using AppImage extraction
 RUN wget -q -O musescore.appimage https://cdn.jsdelivr.net/musescore/v4.4.1/MuseScore-Studio-4.4.1.242490810-x86_64.AppImage && \
@@ -76,10 +92,21 @@ RUN wget -q -O musescore.appimage https://cdn.jsdelivr.net/musescore/v4.4.1/Muse
     rm musescore.appimage && \
     # Create a wrapper script for MuseScore
     echo '#!/bin/bash\n\
-timeout 60 xvfb-run -s "-screen 0 640x480x24 -ac +extension GLX +render -noreset" \
-squashfs-root/bin/mscore4portable "$@"' > /usr/local/bin/mscore && \
+export DISPLAY=:99\n\
+Xvfb :99 -screen 0 1280x1024x24 -ac +extension GLX +render -noreset & \n\
+XVFB_PID=$!\n\
+sleep 3\n\
+# Give Xvfb time to start\n\
+echo "Running MuseScore command: squashfs-root/bin/mscore4portable $*"\n\
+timeout 90 squashfs-root/bin/mscore4portable "$@"\n\
+EXIT_CODE=$?\n\
+kill $XVFB_PID || true\n\
+if [ $EXIT_CODE -ne 0 ]; then\n\
+  echo "MuseScore exited with code $EXIT_CODE"\n\
+fi\n\
+exit $EXIT_CODE' > /usr/local/bin/mscore && \
     chmod +x /usr/local/bin/mscore && \
-    # Test that it works
+    # Test that it works - but don't fail the build if it doesn't
     mscore --version || echo "MuseScore test may fail during build, but should work in runtime"
 
 # Make setup script executable
