@@ -5,6 +5,8 @@ import "./globals.css";
 import { Providers } from "./providers";
 import Link from "next/link";
 import { Music } from "lucide-react";
+import { ClerkProviderWrapper } from "../components/auth/ClerkProviderWrapper";
+import { AuthButton } from "../components/auth/AuthComponent";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,7 +20,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "DaScore | Audio to Sheet Music Converter",
-  description: "Turn your audio into sheet music. Convert WAV files, YouTube videos, and Spotify tracks to sheet music with advanced AI technology.",
+  description: "Turn your audio into sheet music. Convert WAV files, YouTube videos, and Spotify tracks to sheet music with signal processing.",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -66,46 +68,51 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Analytics />
-        <Providers>
-          <div className="relative flex min-h-screen flex-col">
-            {/* Global Navigation Header */}
-            <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-              <div className="container flex h-14 items-center">
-                <div className="mr-4 flex">
-                  <Link href="/" className="flex items-center space-x-2">
-                    <Music className="h-6 w-6 text-primary" />
-                    <span className="font-bold">DaScore</span>
-                  </Link>
-                </div>
-                <nav className="flex flex-1 items-center justify-between">
-                  <div className="flex items-center gap-6 text-sm">
-                    <Link 
-                      href="/" 
-                      className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
-                    >
-                      Home
-                    </Link>
-                    <Link 
-                      href="/upload" 
-                      className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
-                    >
-                      Convert Audio
-                    </Link>
-                    <Link 
-                      href="/roadmap" 
-                      className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
-                    >
-                      Roadmap
+        <ClerkProviderWrapper>
+          <Providers>
+            <div className="relative flex min-h-screen flex-col">
+              {/* Global Navigation Header */}
+              <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                <div className="container flex h-14 items-center">
+                  <div className="mr-4 flex">
+                    <Link href="/" className="flex items-center space-x-2">
+                      <Music className="h-6 w-6 text-primary" />
+                      <span className="font-bold">DaScore</span>
                     </Link>
                   </div>
-                </nav>
+                  <nav className="flex flex-1 items-center justify-between">
+                    <div className="flex items-center gap-6 text-sm">
+                      <Link 
+                        href="/" 
+                        className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
+                      >
+                        Home
+                      </Link>
+                      <Link 
+                        href="/upload" 
+                        className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
+                      >
+                        Convert Audio
+                      </Link>
+                      <Link 
+                        href="/roadmap" 
+                        className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
+                      >
+                        Roadmap
+                      </Link>
+                    </div>
+                    <div className="ml-auto">
+                      <AuthButton />
+                    </div>
+                  </nav>
+                </div>
+              </header>
+              <div className="flex-1">
+                {children}
               </div>
-            </header>
-            <div className="flex-1">
-              {children}
             </div>
-          </div>
-        </Providers>
+          </Providers>
+        </ClerkProviderWrapper>
       </body>
     </html>
   );
