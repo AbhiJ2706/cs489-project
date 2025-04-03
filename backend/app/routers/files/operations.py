@@ -3,8 +3,9 @@ File operations endpoints.
 """
 
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Body
 from fastapi.responses import FileResponse, Response
+from music21 import converter, note
 
 from app.config import TEMP_DIR
 
@@ -96,6 +97,122 @@ async def get_musicxml_content(file_id: str):
         content = f.read()
     
     return Response(content=content, media_type="text/xml")
+
+@router.put("/musicxml-content/{file_id}")
+async def update_musicxml(
+    file_id: str, 
+    note_updates: list = Body(...),
+):
+    """
+    Update notes in a MusicXML file.
+    
+    Args:
+        file_id: ID of the MusicXML file
+        note_updates: List of note updates with format:
+            [
+                {
+                    "measureNumber": int,
+                    "partIndex": int,
+                    "noteIndex": int,
+                    "newPitch": str,
+                    "accidental": str (optional),
+                    "octave": int (optional)
+                },
+                ...
+            ]
+        
+    Returns:
+        dict: Result message
+    """
+    file_path = TEMP_DIR / f"{file_id}.musicxml"
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="MusicXML file not found")
+
+    try:
+        # Parse the MusicXML file
+        score = converter.parse(str(file_path))
+        
+        # Apply the note updates
+        for update in note_updates:
+            measure_number = update["measureNumber"]
+            part_index = update["partIndex"]
+            note_index = update["noteIndex"]
+            new_pitch = update["newPitch"]
+            accidental = update.get("accidental", None)
+            octave = update.get("octave", None)
+            
+            # Get the part
+            if part_index >= len(score.parts):
+                continue
+            
+            part = score.parts[part_index]
+            
+            # Get the measure
+            measures = part.getElementsByClass('Measure')
+            measure = None
+            for m in measures:
+                if m.number == measure_number:
+                    measure = m
+                    break
+            
+            if not measure:
+                continue
+            
+            # Get the note
+            notes = list(measure.notes)
+            if note_index >= len(notes):
+                continue
+            
+            # Get the note to update
+            note_obj = notes[note_index]
+            
+            # Skip if it's a rest
+            if note_obj.isRest:
+                continue
+            
+            # Create new pitch string
+            pitch_str = new_pitch
+            if accidental:
+                if accidental == "sharp":
+                    pitch_str += "#"
+                elif accidental == "flat":
+                    pitch_str += "-"
+            
+            # Apply the octave if provided
+            if octave is not None:
+                # Create a new note with the updated pitch
+                new_note = note.Note(pitch_str + str(octave))
+            else:
+                # Keep the same octave
+                new_note = note.Note(pitch_str + str(note_obj.pitch.octave))
+            
+            # Copy duration and other attributes
+            new_note.duration = note_obj.duration
+            
+            # Replace the note
+            measure.replace(note_obj, new_note)
+        
+        # Write the updated score back to the file
+        score.write('musicxml', fp=str(file_path))
+        
+        # Generate a new ID for the edited version
+        import os
+        edited_file_id = f"{file_id}_edited_{os.urandom(2).hex()}"
+        edited_file_path = TEMP_DIR / f"{edited_file_id}.musicxml"
+        
+        # Save as a new file with _edited suffix
+        score.write('musicxml', fp=str(edited_file_path))
+        
+        return {
+            "status": "success", 
+            "message": "MusicXML updated successfully",
+            "original_file_id": file_id,
+            "edited_file_id": edited_file_id
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating MusicXML: {str(e)}")
 
 @router.get("/files/{file_id}")
 async def get_file(file_id: str, type: str = Query(None)):

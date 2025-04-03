@@ -8,22 +8,30 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, ArrowLeft, Download, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { apiFetch, apiUrl } from "@/lib/apiUtils";
+import { NoteEditor } from "@/components/noteEditor";
+import { Toaster } from "@/components/ui/toaster";
 
 export default function MusicXMLViewer() {
   const { fileId } = useParams();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [musicXmlContent, setMusicXmlContent] = useState<string | null>(null);
+  const [currentFileId, setCurrentFileId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!fileId) return;
+    setCurrentFileId(Array.isArray(fileId) ? fileId[0] : fileId);
+  }, [fileId]);
+
+  useEffect(() => {
+    if (!currentFileId) return;
 
     const fetchMusicXml = async () => {
       try {
         setIsLoading(true);
         setError(null);
 
-        const response = await apiFetch(`musicxml-content/${fileId}`);
+        const response = await apiFetch(`musicxml-content/${currentFileId}`);
         
         if (!response.ok) {
           throw new Error("Failed to load MusicXML content");
@@ -39,12 +47,12 @@ export default function MusicXMLViewer() {
     };
 
     fetchMusicXml();
-  }, [fileId]);
+  }, [currentFileId]);
 
   const handleDownload = () => {
-    if (!fileId) return;
+    if (!currentFileId) return;
     
-    const url = apiUrl(`download/musicxml/${fileId}`);
+    const url = apiUrl(`download/musicxml/${currentFileId}`);
     const link = document.createElement("a");
     link.href = url;
     link.download = "sheet_music.musicxml";
@@ -53,8 +61,13 @@ export default function MusicXMLViewer() {
     document.body.removeChild(link);
   };
 
+  const handleNoteUpdateComplete = (newFileId: string) => {
+    setCurrentFileId(newFileId);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 py-8 px-4">
+      <Toaster />
       <div className="container mx-auto max-w-5xl">
         <div className="mb-8 flex items-center justify-between">
           <Link href="/" className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground">
@@ -84,20 +97,30 @@ export default function MusicXMLViewer() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           ) : (
-            <div className="bg-white rounded-md p-4 overflow-auto">
-              {musicXmlContent && (
-                <OpenSheetMusicDisplay 
-                  musicXml={musicXmlContent}
-                  options={{
-                    autoResize: true,
-                    drawTitle: true,
-                    drawSubtitle: true,
-                    drawComposer: true,
-                    drawCredits: true,
-                  }}
+            <>
+              <div className="bg-white rounded-md p-4 overflow-auto">
+                {musicXmlContent && (
+                  <OpenSheetMusicDisplay 
+                    musicXml={musicXmlContent}
+                    options={{
+                      autoResize: true,
+                      drawTitle: true,
+                      drawSubtitle: true,
+                      drawComposer: true,
+                      drawCredits: true,
+                    }}
+                  />
+                )}
+              </div>
+              
+              {currentFileId && musicXmlContent && (
+                <NoteEditor 
+                  fileId={currentFileId}
+                  musicXmlContent={musicXmlContent}
+                  onUpdateComplete={handleNoteUpdateComplete}
                 />
               )}
-            </div>
+            </>
           )}
         </div>
       </div>
