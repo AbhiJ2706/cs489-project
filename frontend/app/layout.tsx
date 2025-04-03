@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react"
 import "./globals.css";
 import { Providers } from "./providers";
+import Link from "next/link";
+import { Music } from "lucide-react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,8 +17,35 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DaScore",
-  description: "Convert your WAV audio files to sheet music with ease",
+  title: "DaScore | Audio to Sheet Music Converter",
+  description: "Turn your audio into sheet music. Convert WAV files, YouTube videos, and Spotify tracks to sheet music with advanced AI technology.",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/favicon.ico",
+  },
+  openGraph: {
+    title: "DaScore | Transform Audio into Beautiful Sheet Music",
+    description: "Turn your audio into sheet music instantly. Upload WAV files or convert YouTube videos and Spotify tracks to professional sheet music with AI technology.",
+    url: "https://visualize.music",
+    siteName: "DaScore",
+    locale: "en_US",
+    type: "website",
+    images: [
+      {
+        url: "/og-image.png", 
+        width: 1200,
+        height: 630,
+        alt: "DaScore - Audio to Sheet Music Converter"
+      }
+    ],
+  },
+  twitter: {
+    title: "DaScore | Transform Audio into Beautiful Sheet Music",
+    description: "Turn your audio into sheet music instantly. Upload WAV files or convert YouTube videos and Spotify tracks to professional sheet music with AI technology.",
+    card: "summary_large_image",
+    images: ["/og-image.png"],
+  },
 };
 
 export default function RootLayout({
@@ -31,8 +60,40 @@ export default function RootLayout({
       >
         <Analytics />
         <Providers>
-          {/* Navbar will be rendered on client side */}
           <div className="relative flex min-h-screen flex-col">
+            {/* Global Navigation Header */}
+            <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+              <div className="container flex h-14 items-center">
+                <div className="mr-4 flex">
+                  <Link href="/" className="flex items-center space-x-2">
+                    <Music className="h-6 w-6 text-primary" />
+                    <span className="font-bold">DaScore</span>
+                  </Link>
+                </div>
+                <nav className="flex flex-1 items-center justify-between">
+                  <div className="flex items-center gap-6 text-sm">
+                    <Link 
+                      href="/" 
+                      className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
+                    >
+                      Home
+                    </Link>
+                    <Link 
+                      href="/upload" 
+                      className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
+                    >
+                      Convert Audio
+                    </Link>
+                    <Link 
+                      href="/roadmap" 
+                      className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
+                    >
+                      Roadmap
+                    </Link>
+                  </div>
+                </nav>
+              </div>
+            </header>
             <div className="flex-1">
               {children}
             </div>
