@@ -295,14 +295,15 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
         score.write(fmt='musicxml', fp=output_xml, makeNotation=True)
         print(f"MusicXML file saved as: {output_xml}")
         score.write('midi', fp=output_xml.replace("xml", "mid"))
-        if not messy:
-            xml_data = converter.parse(output_xml)
-            score = __combine_rests_in_score(xml_data, title)
-            score.write(fmt='musicxml', fp=output_xml)
-            print(f"MusicXML file edited as: {output_xml}")
 
         if output_pdf:
             try:
+                if not messy:
+                    xml_data = converter.parse(output_xml)
+                    new_score = __combine_rests_in_score(xml_data, title)
+                    new_score.write(fmt='musicxml', fp=output_xml)
+                    print(f"MusicXML file edited as: {output_xml}")
+
                 subprocess.run(
                     ["mscore", "-o", output_pdf, output_xml],
                     check=True,
@@ -312,12 +313,23 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                 print(f"PDF file saved as: {output_pdf}")
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 print(f"Warning: Could not generate PDF. Error: {e}")
-                print("MuseScore is not installed or not in PATH.")
                 print(
                     "You can open the MusicXML file in any notation software to view and export as PDF.")
-                if output_pdf:
-                    print(f"PDF file was not created: {output_pdf}")
-                    return False
+                if not messy:
+                    print("the error may have been caused by rest correction. falling back to uncorrected score.")
+                    try:
+                        score.write(fmt='musicxml', fp=output_xml, makeNotation=True)
+                        subprocess.run(
+                            ["mscore", "-o", output_pdf, output_xml],
+                            check=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE
+                        )
+                        print(f"PDF file saved as: {output_pdf}")
+                    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                        print(f"Warning: Could not generate PDF. Error: {e}")
+                        print("You can open the MusicXML file in any notation software to view and export as PDF.")
+                        print("fallback creation failed.")
 
         return True
     except Exception as e:
