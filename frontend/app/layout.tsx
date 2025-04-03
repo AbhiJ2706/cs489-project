@@ -43,7 +43,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/og-image.png", 
+        url: "/og-image.png",
         width: 1200,
         height: 630,
         alt: "DaScore - Audio to Sheet Music Converter"
@@ -77,31 +77,31 @@ export default function RootLayout({
                 <div className="container flex h-14 items-center px-4">
                   <div className="mr-4 flex">
                     <Link href="/" className="flex items-center space-x-2">
-                      <Image 
-                        src="/darklogo.svg" 
-                        alt="DaScore Logo" 
-                        width={32} 
-                        height={32} 
+                      <Image
+                        src="/darklogo.png"
+                        alt="DaScore Logo"
+                        width={32}
+                        height={32}
                       />
                       <span className="font-bold">DaScore</span>
                     </Link>
                   </div>
                   <nav className="flex flex-1 items-center justify-between">
                     <div className="flex items-center gap-6 text-sm">
-                      <Link 
-                        href="/" 
+                      <Link
+                        href="/"
                         className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
                       >
                         Home
                       </Link>
-                      <Link 
-                        href="/upload" 
+                      <Link
+                        href="/upload"
                         className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
                       >
                         Convert Audio
                       </Link>
-                      <Link 
-                        href="/roadmap" 
+                      <Link
+                        href="/roadmap"
                         className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
                       >
                         Roadmap
