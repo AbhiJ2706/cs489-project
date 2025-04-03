@@ -37,8 +37,10 @@ export default function RoadmapPage() {
             src="https://mew-edge.ideaflow.app/g/all/global-root-to-users/all/users-to-user-relation-id-google-oauth2|101211266193087387124/all/b2022661/959cf461"
             className="w-full h-full rounded-lg border"
             style={{ minHeight: "700px" }}
-            allow="clipboard-read; clipboard-write; camera; microphone; geolocation; fullscreen"
-            sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads allow-modals allow-top-navigation"
+            allow="clipboard-read; clipboard-write; camera; microphone; geolocation; fullscreen; storage-access-by-user-activation"
+            sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads allow-modals allow-top-navigation allow-popups-to-escape-sandbox allow-storage-access-by-user-activation"
+            referrerPolicy="origin"
+            loading="lazy"
           ></iframe>
         </div>
       </main>
