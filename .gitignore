@@ -20,4 +20,4 @@ output.musicxml
 output.pdf
 test.pdf
 __pycache__/
-copyright.txt
+copyright.txt*.sf2
