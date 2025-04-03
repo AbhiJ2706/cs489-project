@@ -32,7 +32,7 @@ def stem_file(input):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
-    return f"separated/htdemucs/{input[:input.index(".wav")]}/other.wav"
+    return f"separated/htdemucs/{input[:input.index('.wav')]}/other.wav"
 
 
 def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, stem=False, output_pdf=None, messy=False):
