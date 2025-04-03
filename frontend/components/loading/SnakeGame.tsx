@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSwipeable } from 'react-swipeable';
 
 // Types
@@ -75,25 +75,24 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({
     setDirection('RIGHT');
     setGameOver(false);
     setScore(0);
-    placeFood(snake);
+    placeFood();
   };
 
   // Place food at random position
-  const placeFood = useCallback((initialSnake?: SnakePart[]) => {
-    const snakeToCheck = initialSnake || snake;
+  const placeFood = () => {
     const newFood = {
       x: Math.floor(Math.random() * GRID_SIZE.width),
       y: Math.floor(Math.random() * GRID_SIZE.height)
     };
 
     // Make sure food doesn't appear on the snake
-    const isOnSnake = snakeToCheck.some(part => part.x === newFood.x && part.y === newFood.y);
+    const isOnSnake = snake.some(part => part.x === newFood.x && part.y === newFood.y);
     if (isOnSnake) {
-      placeFood(snakeToCheck);
+      placeFood();
     } else {
       setFood(newFood);
     }
-  }, [snake]);
+  };
 
   // Check if snake hit itself or wall
   const checkCollision = (head: Position): boolean => {
@@ -167,7 +166,7 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({
     // Check if food eaten
     if (head.x === food.x && head.y === food.y) {
       setScore(prev => prev + 1);
-      placeFood(snake);
+      placeFood();
     } else {
       // Remove tail if no food eaten
       newSnake.pop();
@@ -314,8 +313,8 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({
 
   // Place initial food
   useEffect(() => {
-    placeFood(snake);
-  }, [placeFood, snake]);
+    placeFood();
+  }, []);
 
   return (
     <div
