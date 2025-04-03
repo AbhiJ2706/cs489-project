@@ -66,6 +66,14 @@ async def convert_youtube(
             'quiet': True,
             'no_warnings': True,
             'cookiefile': get_youtube_cookies_path(),  # Use cookies file to bypass bot protection
+            # Rate limiting to avoid triggering YouTube's anti-bot mechanisms
+            'ratelimit': 50 * 1024,  # 50K/s limit
+            'sleep_interval': 5,     # Sleep 5 seconds between requests
+            'sleep_interval_requests': 2,  # Sleep after every 2 requests
+            'verbose': True,  # Enable verbose output for debugging
+            # Only download the section from beginning to max_duration
+            'download_sections': f'*0:{max_duration}',
+            'force_keyframes_at_cuts': True,  # Ensure accurate cuts
         }
         
         # Variable to store the original audio duration
@@ -108,10 +116,9 @@ async def convert_youtube(
                     ar=44100,    # Audio sample rate
                     ac=2,        # Stereo audio
                     acodec='pcm_s16le',  # 16-bit PCM encoding for WAV
-                    t=max_duration         # Limit to specified seconds
                 ).overwrite_output().run(quiet=True, capture_stdout=True, capture_stderr=True)
                 
-                logger.info(f"Created {max_duration}-second WAV clip from YouTube audio: {wav_path}")
+                logger.info(f"Created WAV clip from YouTube audio: {wav_path}")
             except Exception as e:
                 # If the ffmpeg-python library fails, fall back to subprocess if ffmpeg is available
                 print(f"FFmpeg-python error: {str(e)}")
@@ -120,12 +127,11 @@ async def convert_youtube(
                         'ffmpeg', '-i', str(downloaded_file), 
                         '-ar', '44100', '-ac', '2', 
                         '-acodec', 'pcm_s16le',
-                        '-t', str(max_duration),  # Limit to specified seconds
                         str(wav_path),
                         '-y', '-loglevel', 'error'
                     ], check=True)
                     
-                    logger.info(f"Created {max_duration}-second WAV clip from YouTube audio using subprocess: {wav_path}")
+                    logger.info(f"Created WAV clip from YouTube audio using subprocess: {wav_path}")
                 else:
                     raise HTTPException(
                         status_code=500,
