@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useSwipeable } from 'react-swipeable';
 
 // Types
@@ -38,7 +38,7 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const requestRef = useRef<number>();
+  const requestRef = useRef<number>(0);
   const lastRenderTimeRef = useRef<number>(0);
 
   // Calculate canvas size based on the size prop
@@ -75,24 +75,25 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({
     setDirection('RIGHT');
     setGameOver(false);
     setScore(0);
-    placeFood();
+    placeFood(snake);
   };
 
   // Place food at random position
-  const placeFood = () => {
+  const placeFood = useCallback((initialSnake?: SnakePart[]) => {
+    const snakeToCheck = initialSnake || snake;
     const newFood = {
       x: Math.floor(Math.random() * GRID_SIZE.width),
       y: Math.floor(Math.random() * GRID_SIZE.height)
     };
-    
+
     // Make sure food doesn't appear on the snake
-    const isOnSnake = snake.some(part => part.x === newFood.x && part.y === newFood.y);
+    const isOnSnake = snakeToCheck.some(part => part.x === newFood.x && part.y === newFood.y);
     if (isOnSnake) {
-      placeFood();
+      placeFood(snakeToCheck);
     } else {
       setFood(newFood);
     }
-  };
+  }, [snake]);
 
   // Check if snake hit itself or wall
   const checkCollision = (head: Position): boolean => {
@@ -112,7 +113,7 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({
         return true;
       }
     }
-    
+
     return false;
   };
 
@@ -122,17 +123,17 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({
 
     // Calculate delta time
     const deltaTime = timestamp - lastRenderTimeRef.current;
-    
+
     if (deltaTime >= GAME_SPEED) {
       lastRenderTimeRef.current = timestamp;
-      
+
       updateGameState();
       drawGame();
     }
 
     requestRef.current = requestAnimationFrame(gameLoop);
   };
-  
+
   // Update game state (move snake, check collisions)
   const updateGameState = () => {
     const newSnake = [...snake];
@@ -162,11 +163,11 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({
 
     // Insert new head
     newSnake.unshift(head);
-    
+
     // Check if food eaten
     if (head.x === food.x && head.y === food.y) {
       setScore(prev => prev + 1);
-      placeFood();
+      placeFood(snake);
     } else {
       // Remove tail if no food eaten
       newSnake.pop();
@@ -179,7 +180,7 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({
   const drawGame = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -200,14 +201,14 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({
         // Make body slightly transparent
         ctx.fillStyle = `${color}cc`;
       }
-      
+
       ctx.fillRect(
         part.x * cellWidth,
         part.y * cellHeight,
         cellWidth,
         cellHeight
       );
-      
+
       // Add rounded corners for better visuals
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
       ctx.lineWidth = 1;
@@ -230,7 +231,7 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({
       Math.PI * 2
     );
     ctx.fill();
-    
+
     // Draw loading progress text
     if (isLoading) {
       ctx.fillStyle = 'white';
@@ -283,7 +284,7 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({
         cancelAnimationFrame(requestRef.current);
       }
     }
-    
+
     return () => {
       if (requestRef.current) {
         cancelAnimationFrame(requestRef.current);
@@ -302,23 +303,23 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
+
     // Set actual canvas size
     canvas.width = canvasSize.width;
     canvas.height = canvasSize.height;
-    
+
     // Initial draw
     drawGame();
   }, [canvasSize]);
 
   // Place initial food
   useEffect(() => {
-    placeFood();
-  }, []);
+    placeFood(snake);
+  }, [placeFood, snake]);
 
   return (
-    <div 
-      {...swipeHandlers} 
+    <div
+      {...swipeHandlers}
       className="flex flex-col items-center justify-center touch-none select-none"
     >
       <canvas
@@ -326,13 +327,13 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({
         width={canvasSize.width}
         height={canvasSize.height}
         className="border border-gray-300 rounded-lg shadow-md bg-gray-900"
-        style={{ 
-          width: canvasSize.width, 
-          height: canvasSize.height, 
-          touchAction: 'none' 
+        style={{
+          width: canvasSize.width,
+          height: canvasSize.height,
+          touchAction: 'none'
         }}
       />
-      
+
       {/* Mobile controls */}
       <div className="md:hidden mt-4 grid grid-cols-3 gap-2">
         <div />
@@ -343,7 +344,7 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({
           ↑
         </button>
         <div />
-        
+
         <button
           className="p-4 bg-gray-800 rounded-lg shadow-md"
           onClick={() => direction !== 'RIGHT' && setDirection('LEFT')}
@@ -362,7 +363,7 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({
         >
           →
         </button>
-        
+
         <div />
         <button
           className="p-4 bg-gray-800 rounded-lg shadow-md"
@@ -372,7 +373,7 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({
         </button>
         <div />
       </div>
-      
+
       {gameOver && (
         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white p-6 rounded-lg shadow-lg text-center">
