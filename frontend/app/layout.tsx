@@ -20,6 +20,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://visualize.music'),
   title: "DaScore | Audio to Sheet Music Converter",
   description: "Turn your audio into sheet music. Convert WAV files, YouTube videos, and Spotify tracks to sheet music with signal processing.",
   icons: {

@@ -16,7 +16,11 @@ import numpy as np
 setup_musescore_path()
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 logger = logging.getLogger(__name__)
 
 LOW_FREQUENCY = 25
@@ -159,12 +163,24 @@ def __combine_rests_in_part(part, i):
     return new_part
 
 
-def __combine_rests_in_score(score, title):
+def __combine_rests_in_score(score):
+    # Log the original title to debug the issue
+    logger.info(f"Original title before rest combination: '{score.metadata.title if score.metadata and score.metadata.title else 'None'}'")
+    
     new_score = stream.Score()
-    new_score.metadata = metadata.Metadata()
-    new_score.metadata.title = title
+    new_score.metadata = score.metadata
+    
+    # Ensure we're explicitly setting the title
+    if score.metadata and score.metadata.title:
+        new_score.metadata.title = score.metadata.title
+        logger.info(f"Setting new score title to: '{new_score.metadata.title}'")
+    else:
+        new_score.metadata.title = "Transcribed Music"
+        logger.warning("No title found in original score, using default")
+    
     for i, part in enumerate(score.getElementsByClass(stream.Part)):
         new_score.append(__combine_rests_in_part(part, i))
+    
     return new_score
 
 
@@ -172,7 +188,7 @@ def __closest(d):
     return TIME_TO_REST[min(TIME_TO_REST, key=lambda x: abs(d - x))]
 
 
-def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
+def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120, composer="Dascore"):
     try:
         tp = tp[0]
     except:
@@ -181,6 +197,9 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
     score = stream.Score()
     score.metadata = metadata.Metadata()
     score.metadata.title = title
+    score.metadata.composer = composer
+    
+    logger.info(f"Creating score with title: '{title}' and composer: '{composer}'")
 
     treble_part = stream.Part()
     treble_part.insert(0, instrument.Piano())
@@ -193,8 +212,7 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
     bass_part.append(meter.TimeSignature('4/4'))
 
     if tp < 20 or tp > 300:
-        print(
-            f"Warning: Unusual tempo value ({tp}), using default of 120 BPM")
+        logger.warning(f"Unusual tempo value ({tp}), using default of 120 BPM")
         tp = 120
 
     treble_part.append(tempo.MetronomeMark(number=float(tp)))
@@ -276,13 +294,26 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
 
 def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy=False, title=None):
     try:
+        # Store the original metadata
+        original_title = None
+        original_composer = None
+        
+        if score.metadata:
+            if score.metadata.title:
+                original_title = score.metadata.title
+                logger.info(f"Processing score with title: '{original_title}'")
+            
+            if score.metadata.composer:
+                original_composer = score.metadata.composer
+                logger.info(f"Processing score with composer: '{original_composer}'")
+        
         output_dir = os.path.dirname(output_xml)
         if output_dir and not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
         for part in score.parts:
             if len(part.getElementsByClass('Measure')) == 0:
-                print("Warning: Part has no measures. Adding a measure...")
+                logger.warning("Part has no measures. Adding a measure...")
                 m = stream.Measure(number=1)
                 if len(part.getElementsByClass(['Note', 'Rest'])) == 0:
                     r = note.Rest('whole')
@@ -293,24 +324,94 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                 part.append(m)
 
         score.write(fmt='musicxml', fp=output_xml, makeNotation=True)
-        print(f"MusicXML file saved as: {output_xml}")
+        logger.info(f"MusicXML file saved: {output_xml}")
         score.write('midi', fp=output_xml.replace("xml", "mid"))
+        
+        if not messy:
+            xml_data = converter.parse(output_xml)
+            
+            # Ensure metadata is preserved after parsing
+            if not xml_data.metadata:
+                xml_data.metadata = metadata.Metadata()
+                
+            if original_title:
+                xml_data.metadata.title = original_title
+                logger.info(f"Restored title metadata after parsing: '{original_title}'")
+                
+            if original_composer:
+                xml_data.metadata.composer = original_composer
+                logger.info(f"Restored composer metadata after parsing: '{original_composer}'")
+            
+            score = __combine_rests_in_score(xml_data)
+            
+            # Double check metadata is still there
+            if not score.metadata:
+                score.metadata = metadata.Metadata()
+                
+            if original_title and (not score.metadata.title or score.metadata.title != original_title):
+                score.metadata.title = original_title
+                logger.info(f"Re-applied title metadata after rest combination: '{original_title}'")
+                
+            if original_composer and (not score.metadata.composer or score.metadata.composer != original_composer):
+                score.metadata.composer = original_composer
+                logger.info(f"Re-applied composer metadata after rest combination: '{original_composer}'")
+            
+            score.write(fmt='musicxml', fp=output_xml)
+            logger.info(f"MusicXML file processed with rest combination: {output_xml}")
 
         if output_pdf:
             try:
-                if not messy:
-                    xml_data = converter.parse(output_xml)
-                    new_score = __combine_rests_in_score(xml_data, title)
-                    new_score.write(fmt='musicxml', fp=output_xml)
-                    print(f"MusicXML file edited as: {output_xml}")
-
+                # Force metadata into the XML file before sending to MuseScore
+                tree = ET.parse(output_xml)
+                root = tree.getroot()
+                
+                # Handle title
+                if original_title:
+                    # Find or create work-title element
+                    work = root.find(".//work")
+                    if work is None:
+                        # Create work element if it doesn't exist
+                        identification = root.find(".//identification")
+                        if identification is not None:
+                            work = ET.Element("work")
+                            root.insert(0, work)
+                    
+                    if work is not None:
+                        work_title = work.find("work-title")
+                        if work_title is None:
+                            work_title = ET.SubElement(work, "work-title")
+                        work_title.text = original_title
+                        
+                        # Also set movement-title if present
+                        movement_title = root.find(".//movement-title")
+                        if movement_title is not None:
+                            movement_title.text = original_title
+                
+                # Handle composer
+                if original_composer:
+                    # Find or create identification/creator element
+                    identification = root.find(".//identification")
+                    if identification is None:
+                        identification = ET.Element("identification")
+                        root.insert(1 if root.find(".//work") is not None else 0, identification)
+                    
+                    creator = identification.find("./creator[@type='composer']")
+                    if creator is None:
+                        creator = ET.SubElement(identification, "creator")
+                        creator.set("type", "composer")
+                    creator.text = original_composer
+                
+                # Write back to file
+                tree.write(output_xml)
+                logger.info(f"Manually corrected metadata in XML file: Title='{original_title}', Composer='{original_composer}'")
+                
                 subprocess.run(
                     ["mscore", "-o", output_pdf, output_xml],
                     check=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE
                 )
-                print(f"PDF file saved as: {output_pdf}")
+                logger.info(f"PDF file created: {output_pdf}")
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 print(f"Warning: Could not generate PDF. Error: {e}")
                 print(
@@ -335,8 +436,8 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        print(f"Error generating sheet music: {e}")
-        print(f"Error details:\n{error_details}")
+        logger.error(f"Error generating sheet music: {e}")
+        logger.debug(f"Error details:\n{error_details}")
         return False
 
 

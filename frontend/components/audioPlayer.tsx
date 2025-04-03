@@ -4,17 +4,19 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Play, Pause, Volume2, VolumeX, RefreshCw, Download } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, RefreshCw, Download, Clock } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { apiFetch, apiUrl } from "@/lib/apiUtils";
+import { RangeSelector } from "@/components/RangeSelector";
 
 interface AudioPlayerProps {
   file?: File | null;
   fileId?: string | null;
   originalAudio?: boolean;
+  onTimeRangeChange?: (range: [number, number]) => void;
 }
 
-export function AudioPlayer({ file, fileId, originalAudio = false }: AudioPlayerProps) {
+export function AudioPlayer({ file, fileId, originalAudio = false, onTimeRangeChange }: AudioPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -22,6 +24,7 @@ export function AudioPlayer({ file, fileId, originalAudio = false }: AudioPlayer
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [timeRange, setTimeRange] = useState<[number, number]>([0, 0]);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressInterval = useRef<NodeJS.Timeout | null>(null);
@@ -45,7 +48,17 @@ export function AudioPlayer({ file, fileId, originalAudio = false }: AudioPlayer
     
     // Set up event listeners
     audio.addEventListener("loadedmetadata", () => {
-      setDuration(audio.duration);
+      const fullDuration = Math.ceil(audio.duration);
+      setDuration(fullDuration);
+      
+      // Update time range to use the full audio duration when loaded
+      const fullRange: [number, number] = [0, fullDuration];
+      setTimeRange(fullRange);
+      
+      // Notify parent component of the full range
+      if (onTimeRangeChange) {
+        onTimeRangeChange(fullRange);
+      }
     });
     
     audio.addEventListener("ended", () => {
@@ -150,9 +163,27 @@ export function AudioPlayer({ file, fileId, originalAudio = false }: AudioPlayer
         progressInterval.current = null;
       }
     } else {
+      // Start playing from the selected time range start if current time is outside range
+      if (audioRef.current.currentTime < timeRange[0] || audioRef.current.currentTime > timeRange[1]) {
+        audioRef.current.currentTime = timeRange[0];
+        setCurrentTime(timeRange[0]);
+      }
+      
       audioRef.current.play();
       progressInterval.current = setInterval(() => {
         if (audioRef.current) {
+          // Stop playback if we reach the end of the selected range
+          if (audioRef.current.currentTime >= timeRange[1]) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = timeRange[0];
+            setCurrentTime(timeRange[0]);
+            setIsPlaying(false);
+            if (progressInterval.current) {
+              clearInterval(progressInterval.current);
+              progressInterval.current = null;
+            }
+            return;
+          }
           setCurrentTime(audioRef.current.currentTime);
         }
       }, 100);
@@ -245,6 +276,33 @@ export function AudioPlayer({ file, fileId, originalAudio = false }: AudioPlayer
                 <span>{formatTime(duration)}</span>
               </div>
               
+              {/* Time Range Selector */}
+              <div className="space-y-2 border-t border-dashed pt-3 mt-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">Audio Time Range</span>
+                  </div>
+                  <span className="text-sm font-medium">{timeRange[0].toFixed(1)} - {timeRange[1].toFixed(1)} seconds</span>
+                </div>
+                <RangeSelector
+                  min={0}
+                  max={duration || 1} // Use 1 second if duration is 0
+                  defaultValue={timeRange}
+                  onValueChange={(values) => {
+                    setTimeRange(values);
+                    if (onTimeRangeChange) {
+                      onTimeRangeChange(values);
+                    }
+                  }}
+                  step={0.5}
+                  className="py-2"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Use the range selector to set audio start and end positions for conversion
+                </p>
+              </div>
+
               <div className="flex justify-center gap-4">
                 <Button 
                   variant="outline" 

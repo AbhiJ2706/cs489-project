@@ -12,6 +12,7 @@ import { apiFetch } from "../lib/apiUtils";
 interface ConversionPanelProps {
   file: File | null;
   onConversionComplete: (fileId: string) => void;
+  timeRange?: [number, number]; // Optional time range parameter for audio conversion
 }
 
 interface ConversionResponse {
@@ -20,7 +21,7 @@ interface ConversionResponse {
   has_pdf: boolean;
 }
 
-export function ConversionPanel({ file, onConversionComplete }: ConversionPanelProps) {
+export function ConversionPanel({ file, onConversionComplete, timeRange = [0, 60] }: ConversionPanelProps) {
   const [isConverting, setIsConverting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +45,12 @@ export function ConversionPanel({ file, onConversionComplete }: ConversionPanelP
       // Create form data for the file upload
       const formData = new FormData();
       formData.append("file", file);
+      
+      // Add the time range for audio processing
+      const [startTime, endTime] = timeRange;
+      formData.append("start_time", startTime.toString());
+      formData.append("end_time", endTime.toString());
+      formData.append("duration", (endTime - startTime).toString());
       
       // Optional: Add title from filename
       const title = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
@@ -94,7 +101,7 @@ export function ConversionPanel({ file, onConversionComplete }: ConversionPanelP
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileMusic className="h-5 w-5" />
-          Convert to Sheet Music
+          Convert to Sheet Music {timeRange && ` (${timeRange[0].toFixed(1)}s - ${timeRange[1].toFixed(1)}s)`}
         </CardTitle>
       </CardHeader>
       <CardContent>

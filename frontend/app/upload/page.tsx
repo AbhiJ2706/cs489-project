@@ -32,18 +32,23 @@ export default function UploadPage() {
   const [convertedFileId, setConvertedFileId] = useState<string | null>(null);
 
   // YouTube URL state
-  const [youtubeUrl, setYoutubeUrl] = useState<string>("");
+  const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null);
   const [isProcessingYoutube, setIsProcessingYoutube] = useState(false);
-
-  // Spotify URL state
-  const [spotifyUrl, setSpotifyUrl] = useState<string>("");
   const [isProcessingSpotify, setIsProcessingSpotify] = useState(false);
+  
+  const [spotifyUrl, setSpotifyUrl] = useState<string | null>(null);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+  const [spotifyData, setSpotifyData] = useState<any>(null);
+  
+  // Audio time range for conversion
+  const [audioTimeRange, setAudioTimeRange] = useState<[number, number]>([0, 0]);
 
-  // Duration setting
-  const [maxDuration, setMaxDuration] = useState<number>(20);
-
-  // Progress simulation
+  // Progress simulation and maximum duration
   const [processingProgress, setProcessingProgress] = useState<number>(0);
+  const [maxDuration, setMaxDuration] = useState<number>(60);
+  
+  // Metadata for score
+  const [scoreTitle, setScoreTitle] = useState<string>("");
 
   // UI state
   const [step, setStep] = useState<
@@ -98,9 +103,33 @@ export default function UploadPage() {
   };
 
   // Function to handle URL submission (YouTube or Spotify)
-  const handleUrlSubmit = async (url: string, maxDuration?: number) => {
-    // Default to 20 seconds if no duration is provided
-    const duration = maxDuration || 20;
+  const handleUrlSubmit = async (url: string, trackData?: any) => {
+    // Set progress to 0
+    setProcessingProgress(0);
+
+    // Calculate duration from audio time range
+    const [startTime, endTime] = audioTimeRange;
+    const duration = endTime - startTime;
+    
+    // Store track data if it's from Spotify
+    if (trackData) {
+      setSpotifyData(trackData);
+      setSpotifyUrl(url);
+      setIsProcessingSpotify(true);
+      
+      // Set a title for the score based on the track info
+      const title = trackData.name || "Spotify Track";
+      const artist = trackData.artists?.[0]?.name || "Unknown Artist";
+      setScoreTitle(`${title} - ${artist}`);
+    } else {
+      // It's a YouTube URL
+      // If URL doesn't have a time parameter, add the start time
+      const urlWithTime = url.includes('t=') ? url : (
+        url.includes('?') ? `${url}&t=${Math.floor(startTime)}` : `${url}?t=${Math.floor(startTime)}`
+      );
+      setYoutubeUrl(urlWithTime);
+      setIsProcessingYoutube(true);
+    }
 
     // Detect URL type for UI feedback (processing state)
     const isYoutubeUrl = url.includes("youtube.com") || url.includes("youtu.be");
@@ -406,7 +435,7 @@ export default function UploadPage() {
         {step === "upload" && (
           <FileUpload
             onFileSelect={handleFileSelect}
-            onUrlSubmit={(url, maxDuration) => handleUrlSubmit(url, maxDuration)}
+            onUrlSubmit={(url) => handleUrlSubmit(url)}
           />
         )}
 
@@ -419,10 +448,15 @@ export default function UploadPage() {
         {/* Step: Convert (WAV file) */}
         {selectedFile && step === "processing-file" && (
           <>
-            <AudioPlayer file={selectedFile} />
+            <AudioPlayer 
+              file={selectedFile}
+              onTimeRangeChange={setAudioTimeRange}
+            />
             <ConversionPanel
               file={selectedFile}
               onConversionComplete={handleConversionComplete}
+              // Pass the time range to the conversion panel
+              timeRange={audioTimeRange}
             />
           </>
         )}

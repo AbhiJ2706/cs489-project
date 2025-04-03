@@ -16,7 +16,11 @@ from app.process_audio import detect_notes_and_chords, preprocess_audio
 from app.visualize import visualize_audio
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 logger = logging.getLogger(__name__)
 
 # Initialize MuseScore path
@@ -36,50 +40,46 @@ def stem_file(input):
     return f"separated/htdemucs/{input[:input.index('.wav')]}/other.wav"
 
 
-def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, stem=False, output_pdf=None, messy=False, visualize_only=False):
-    print(f"Loading audio file: {input_wav}")
+def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, stem=False, output_pdf=None, messy=False, visualize_only=False, composer="Dascore"):
+    logger.info(f"Processing audio file: {input_wav}")
     try:
         if stem:
+            logger.info("Applying audio source separation...")
             new_filepath = stem_file(input_wav)
             audio_data, sample_rate = load_audio_with_fallback(new_filepath)
         else:
             audio_data, sample_rate = load_audio_with_fallback(input_wav)
     except Exception as e:
-        print(f"Error loading audio: {e}")
-        print(f"Error details:\n{traceback.format_exc()}")
+        logger.error(f"Error loading audio: {e}")
+        logger.debug(f"Error details:\n{traceback.format_exc()}")
         return False
 
-    print(f"Sample rate: {sample_rate}")
+    logger.info(f"Audio loaded with sample rate: {sample_rate} Hz")
 
-    print("Detecting tempo...")
+    logger.info("Detecting tempo...")
     tempo_value, _ = librosa.beat.beat_track(y=audio_data, sr=sample_rate)
-    print(f"""
-          Detected tempo: {tempo_value} BPM, 
-          Length of a bar: {240 / tempo_value[0]}
-          Length of a quarter note: {60 / tempo_value[0]}
-          Length of a 16th note: {15 / tempo_value[0]}
-    """)
+    logger.info(f"Detected tempo: {tempo_value} BPM")
+    logger.debug(f"Bar length: {240 / tempo_value[0]} s, Quarter note: {60 / tempo_value[0]} s, 16th note: {15 / tempo_value[0]} s")
 
     if title is None:
         title = os.path.splitext(os.path.basename(input_wav))[0]
+        logger.info(f"Using filename as title: '{title}'")
 
-    print("Preprocessing audio...")
+    logger.info("Preprocessing audio...")
     preprocessed_audio = preprocess_audio(audio_data, sample_rate)
 
     if visualize_only:
-        print("performing visualizations only")
-        output_image = os.path.splitext(output_xml)[0]
-        visualize_audio(preprocessed_audio, sample_rate,
-                        output_image, tempo_value[0])
-        return
+        logger.info("Generating visualization only...")
+        output_image = os.path.splitext(output_xml)[0] + "_visualization.png"
+        visualize_audio(preprocessed_audio, sample_rate, output_image, tempo_value[0])
+        logger.info(f"Visualization saved to: {output_image}")
+        return True
 
-    print("Detecting notes...")
-    midi_data = detect_notes_and_chords(
-        preprocessed_audio, sample_rate, tempo_value[0])
+    logger.info("Detecting notes and chords...")
+    midi_data = detect_notes_and_chords(preprocessed_audio, sample_rate, tempo_value[0])
 
-    print("Converting to MusicXML...")
-    score = midi_to_musicxml(
-        midi_data, title=title, tp=tempo_value)
+    logger.info("Converting to MusicXML...")
+    score = midi_to_musicxml(midi_data, title=title, tp=tempo_value[0], composer=composer)
 
     print("Generating sheet music...")
     success = generate_sheet_music(score, output_xml, output_pdf, messy=messy, title=title)
@@ -88,11 +88,12 @@ def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, stem=
         print("Generating audio visualization...")
         output_image = os.path.splitext(output_xml)[0]
         visualize_audio(preprocessed_audio, sample_rate, output_image)
+        logger.info(f"Visualization saved to: {output_image}")
 
     if success:
-        print("Conversion completed successfully.")
+        logger.info("Conversion completed successfully")
     else:
-        print("Conversion completed with errors.")
+        logger.error("Conversion completed with errors")
 
     return True
 
@@ -114,6 +115,8 @@ if __name__ == "__main__":
                         help="turn off rest post-processing")
     parser.add_argument("--visualize-only", action="store_true",
                         help="only visualize data")
+    parser.add_argument("--composer", default="Dascore",
+                        help="Composer name (default: Dascore)")
 
     args = parser.parse_args()
 
@@ -131,5 +134,6 @@ if __name__ == "__main__":
         stem=args.stem,
         messy=args.messy,
         visualize_only=args.visualize_only,
-        output_pdf=f"out/{args.title.replace(' ', '_')}/{args.output_pdf}"
+        output_pdf=f"out/{args.title.replace(' ', '_')}/{args.output_pdf}",
+        composer=args.composer
     )

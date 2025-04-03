@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Music, Upload, AlertCircle, Youtube, Music2, Link, Clock, User, TrendingUp } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
+import { RangeSelector } from "@/components/RangeSelector";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { redirectToAuthCodeFlow, fetchProfile, fetchRecentlyPlayed, fetchTopItems } from '@/lib/spotify-api';
@@ -42,6 +43,7 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
   const [urlError, setUrlError] = useState<string | null>(null);
   const [urlType, setUrlType] = useState<"youtube" | "spotify" | null>(null);
   const [isAuthenticatedWithSpotify, setIsAuthenticatedWithSpotify] = useState(false);
+  const [selectedTrack, setSelectedTrack] = useState<any>(null);
   
   // Spotify profile data
   const [profileData, setProfileData] = useState<any>(null);
@@ -50,7 +52,7 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   
   // Duration setting
-  const [maxDuration, setMaxDuration] = useState<number>(20);
+  const [audioDuration, setAudioDuration] = useState<[number, number]>([0, 30]); // Update duration state to range
   
   // Function to load Spotify profile data and recently played tracks
   const loadSpotifyData = useCallback(async () => {
@@ -194,7 +196,7 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
   };
 
   // Handle URL form submission
-  const submitUrl = async (e: React.FormEvent) => {
+  const handleUrlSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!url) {
@@ -202,21 +204,18 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
       return;
     }
     
-    // Validate the URL format
+    // Validate URL format
     if (urlType === "youtube") {
-      // YouTube URL validation
       if (!isValidYouTubeUrl(url)) {
         setUrlError("Please enter a valid YouTube URL");
         return;
       }
     } else if (urlType === "spotify") {
-      // Spotify URL validation
       if (!isValidSpotifyUrl(url)) {
         setUrlError("Please enter a valid Spotify track URL");
         return;
       }
     } else {
-      // No valid URL type detected
       setUrlError("Please enter a valid YouTube or Spotify URL");
       return;
     }
@@ -227,10 +226,44 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
     // Set processing state
     setIsProcessingUrl(true);
     
+    // Calculate duration from range
+    const [startTime, endTime] = audioDuration;
+    const duration = endTime - startTime;
+    
+    // Call the onUrlSubmit callback with the appropriate parameters
+    if (onUrlSubmit) {
+      if (urlType === "spotify") {
+        onUrlSubmit(url, duration, selectedTrack);
+      } else {
+        // For YouTube, add the start time parameter
+        const urlWithRange = url.includes('?') ? 
+          `${url}&t=${startTime}` : 
+          `${url}?t=${startTime}`;
+        onUrlSubmit(urlWithRange, duration);
+      }
+    }
+  };
+  
+  // Submit URL for processing
+  const submitUrl = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     try {
       if (onUrlSubmit) {
-        // Pass the URL and max duration to the parent component
-        await onUrlSubmit(url, maxDuration);
+        // Calculate duration from range
+        const [startTime, endTime] = audioDuration;
+        const duration = endTime - startTime;
+        
+        // For Spotify, pass the selected track data
+        if (urlType === "spotify") {
+          await onUrlSubmit(url, duration, selectedTrack);
+        } else {
+          // For YouTube, add the start time parameter
+          const urlWithRange = url.includes('?') ? 
+            `${url}&t=${startTime}` : 
+            `${url}?t=${startTime}`;
+          await onUrlSubmit(urlWithRange, duration);
+        }
       }
     } catch (error) {
       console.error("Error submitting URL:", error);
@@ -253,7 +286,7 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
            url.startsWith("spotify:track:");
   };
 
-  const handleTrackSelect = (trackUri: string) => {
+  const handleTrackSelect = (trackUri: string, track: any) => {
     // Convert Spotify URI to URL format if needed
     // spotify:track:1234567 => https://open.spotify.com/track/1234567
     let trackUrl = trackUri;
@@ -270,11 +303,14 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
       urlInputRef.current.value = trackUrl;
     }
     
-    // Set the URL type for validation
+    // Store the selected track data
+    setSelectedTrack(track);
+    
+    // Update URL type and validation
     setUrlType("spotify");
     setIsValidUrl(true);
     
-    // Clear any previous errors
+    // Clear any errors
     setUrlError(null);
   };
 
@@ -391,25 +427,25 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
                 )}
               </div>
               
-              {/* Duration Slider - always show it */}
+              {/* Duration Range Selector - always show it */}
               <div className="space-y-2 border-t border-dashed pt-3 mt-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <Clock className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">Audio Duration</span>
+                    <span className="text-sm font-medium">Audio Time Range</span>
                   </div>
-                  <span className="text-sm font-medium">{maxDuration} seconds</span>
+                  <span className="text-sm font-medium">{audioDuration[0]} - {audioDuration[1]} seconds</span>
                 </div>
-                <Slider
-                  value={[maxDuration]}
-                  onValueChange={(values) => setMaxDuration(values[0])}
-                  min={10}
+                <RangeSelector
+                  min={0}
                   max={60}
+                  defaultValue={audioDuration}
+                  onValueChange={(values) => setAudioDuration(values)}
                   step={5}
                   className="py-2"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Use the slider to adjust the length of audio to convert (shorter clips process faster)
+                  Use the range selector to adjust the start and end time of audio to convert (shorter clips process faster)
                 </p>
               </div>
               
@@ -505,7 +541,7 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
                           <div 
                             key={item.played_at} 
                             className="flex items-center gap-2 p-2 rounded hover:bg-green-500/10 cursor-pointer"
-                            onClick={() => handleTrackSelect(item.track.uri)}
+                            onClick={() => handleTrackSelect(item.track.uri, item.track)}
                           >
                             <div className="h-8 w-8 flex-shrink-0 relative">
                               {item.track.album.images && item.track.album.images[0] && (
@@ -541,7 +577,7 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
                           <div 
                             key={track.id} 
                             className="flex items-center gap-2 p-2 rounded hover:bg-green-500/10 cursor-pointer"
-                            onClick={() => handleTrackSelect(track.uri)}
+                            onClick={() => handleTrackSelect(track.uri, track)}
                           >
                             <div className="h-8 w-8 flex-shrink-0 relative">
                               {track.album.images && track.album.images[0] && (
