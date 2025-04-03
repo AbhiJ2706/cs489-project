@@ -8,11 +8,11 @@ import warnings
 import librosa
 import librosa.display
 
-from .utils import setup_musescore_path
-from .create_sheet_music import generate_sheet_music, midi_to_musicxml
-from .load_audio import load_audio_with_fallback
-from .process_audio import detect_notes_and_chords, preprocess_audio
-from .visualize import visualize_audio
+from utils import setup_musescore_path
+from create_sheet_music import generate_sheet_music, midi_to_musicxml
+from load_audio import load_audio_with_fallback
+from process_audio import detect_notes_and_chords, preprocess_audio
+from visualize import visualize_audio
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -35,7 +35,7 @@ def stem_file(input):
     return f"separated/htdemucs/{input[:input.index('.wav')]}/other.wav"
 
 
-def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, stem=False, output_pdf=None, messy=False):
+def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, stem=False, output_pdf=None, messy=False, visualize_only=False):
     print(f"Loading audio file: {input_wav}")
     try:
         if stem:
@@ -64,6 +64,13 @@ def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, stem=
 
     print("Preprocessing audio...")
     preprocessed_audio = preprocess_audio(audio_data, sample_rate)
+
+    if visualize_only:
+        print("performing visualizations only")
+        output_image = os.path.splitext(
+            output_xml)[0] + "_visualization.png"
+        visualize_audio(preprocessed_audio, sample_rate, output_image, tempo_value[0])
+        return
 
     print("Detecting notes...")
     midi_data = detect_notes_and_chords(preprocessed_audio, sample_rate, tempo_value[0])
@@ -104,6 +111,8 @@ if __name__ == "__main__":
                         help="stem the audio")
     parser.add_argument("--messy", action="store_true",
                         help="turn off rest post-processing")
+    parser.add_argument("--visualize-only", action="store_true",
+                        help="only visualize data")
 
     args = parser.parse_args()
 
@@ -117,5 +126,6 @@ if __name__ == "__main__":
         visualize=args.visualize,
         stem=args.stem,
         messy=args.messy,
+        visualize_only=args.visualize_only,
         output_pdf=f"out/{args.title.replace(' ', '_')}/{args.output_pdf}"
     )

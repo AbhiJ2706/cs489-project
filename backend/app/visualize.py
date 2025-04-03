@@ -4,8 +4,39 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import find_peaks
 
+from process_audio import HOP_LENGTH, NOTE_NOISE_FLOOR_MULTIPLIER, __determine_start_end_frames, __determine_valid, __track_note_peaks, determine_potential_notes
 
-def visualize_audio(audio_data, sample_rate, output_image=None):
+
+def find_valid_notes(audio_data, sample_rate, tempo, energy_map, noise_floor_threshold):
+    min_note_duration_frames = (15 / tempo * sample_rate) // HOP_LENGTH + 1
+
+    print(f"min note duration in frames: {min_note_duration_frames}")
+
+    C, onset_times = determine_potential_notes(audio_data, sample_rate)
+
+    validity = []
+
+    for i in range(len(onset_times) - 1):
+        start_frame, end_frame, end_time = __determine_start_end_frames(
+            onset_times[i], onset_times[i + 1], audio_data, sample_rate, C, noise_floor_threshold)
+
+        validity.append(__determine_valid(start_frame, end_frame,
+                        energy_map, min_note_duration_frames, noise_floor_threshold, add_reasons=True))
+        
+        if validity[-1][0]:
+            segment = C[:, start_frame:end_frame]
+
+            if segment.size > 0:
+                pitch_peaks = __track_note_peaks(segment)
+                if not pitch_peaks: 
+                    validity[-1] = (False, "no peaks found")
+                else:
+                    validity[-1] = (True, pitch_peaks)
+
+    return validity
+
+
+def visualize_audio(audio_data, sample_rate, output_image=None, tempo=120):
     """
     Visualize the audio waveform and spectrogram.
 
@@ -15,13 +46,27 @@ def visualize_audio(audio_data, sample_rate, output_image=None):
         output_image (str, optional): Path to save the visualization
     """
 
-    plt.figure(figsize=(12, 8))
+    energy_map = librosa.feature.rms(
+        y=audio_data, frame_length=HOP_LENGTH, hop_length=HOP_LENGTH).reshape(-1,)
+    noise_floor_threshold = NOTE_NOISE_FLOOR_MULTIPLIER * \
+        np.percentile(energy_map, 10)
+    
+    audio_data = audio_data[:45*44100]
 
-    plt.subplot(3, 1, 1)
+    notes = find_valid_notes(audio_data, sample_rate, tempo, energy_map, noise_floor_threshold)
+    plt.clf()
+
+    plt.figure(figsize=(24, 16))
+    plt.tight_layout()
+
+    plt.subplot(6, 1, 1)
     librosa.display.waveshow(audio_data, sr=sample_rate)
     plt.title('Waveform')
     plt.xlabel('Time (s)')
     plt.ylabel('Amplitude')
+
+    for note in notes:
+        print(note)
 
     onset_strength = librosa.onset.onset_strength(
         y=audio_data, sr=sample_rate, hop_length=512)
@@ -37,21 +82,35 @@ def visualize_audio(audio_data, sample_rate, output_image=None):
         sr=sample_rate,
         hop_length=512
     )
-    for onset in onsets:
-        plt.axvline(x=onset, color="red")
+    for n, onset in zip(notes, onsets):
+        plt.axvline(x=onset, color="red" if not n[0] else "green")
 
-    plt.subplot(3, 1, 2)
-    plt.title('Waveform')
+    plt.subplot(6, 1, 2)
+    plt.title('Onset (energy)')
     plt.xlabel('Time (s)')
     plt.ylabel('Amplitude')
-    onsets = librosa.onset.onset_strength(
+    onsets_energy = librosa.onset.onset_strength(
         y=audio_data, sr=sample_rate, hop_length=512)
-    peaks = find_peaks(np.array(onsets.reshape(-1,)))[0]
-    mask = np.zeros(onsets.size, dtype=bool)
-    mask[peaks] = True
-    plt.plot(np.where(mask, onsets, 0))
+    plt.plot(onsets_energy)
 
-    plt.subplot(3, 1, 3)
+    plt.subplot(6, 1, 3)
+    plt.title('Onset (phase)')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Amplitude')
+    onsets_phase = librosa.onset.onset_strength(
+        y=audio_data, sr=sample_rate, hop_length=512, feature=librosa.feature.chroma_stft)
+    plt.plot(onsets_phase)
+
+    onset_env_energy_norm = onsets_energy / onsets_energy.max()
+    onset_env_phase_norm = onsets_phase / onsets_phase.max()
+
+    plt.subplot(6, 1, 4)
+    plt.title('Onset (multiplicative)')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Amplitude')
+    plt.plot(onset_env_energy_norm * onset_env_phase_norm)
+
+    plt.subplot(6, 1, 5)
     D = librosa.amplitude_to_db(np.abs(librosa.stft(audio_data)), ref=np.max)
     librosa.display.specshow(D, sr=sample_rate, x_axis='time', y_axis='log')
     plt.colorbar(format='%+2.0f dB')
