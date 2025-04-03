@@ -44,6 +44,7 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
   const [urlType, setUrlType] = useState<"youtube" | "spotify" | null>(null);
   const [isAuthenticatedWithSpotify, setIsAuthenticatedWithSpotify] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState<any>(null);
+  const [mediaDuration, setMediaDuration] = useState<number>(0); // Track duration in seconds
   
   // Spotify profile data
   const [profileData, setProfileData] = useState<any>(null);
@@ -52,7 +53,7 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   
   // Duration setting
-  const [audioDuration, setAudioDuration] = useState<[number, number]>([0, 30]); // Update duration state to range
+  const [audioDuration, setAudioDuration] = useState<[number, number]>([0, 0]); // Update duration state to range
   
   // Function to load Spotify profile data and recently played tracks
   const loadSpotifyData = useCallback(async () => {
@@ -427,27 +428,7 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
                 )}
               </div>
               
-              {/* Duration Range Selector - always show it */}
-              <div className="space-y-2 border-t border-dashed pt-3 mt-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">Audio Time Range</span>
-                  </div>
-                  <span className="text-sm font-medium">{audioDuration[0]} - {audioDuration[1]} seconds</span>
-                </div>
-                <RangeSelector
-                  min={0}
-                  max={60}
-                  defaultValue={audioDuration}
-                  onValueChange={(values) => setAudioDuration(values)}
-                  step={5}
-                  className="py-2"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Use the range selector to adjust the start and end time of audio to convert (shorter clips process faster)
-                </p>
-              </div>
+             
               
               {/* Preview for YouTube URLs */}
               {url && urlType === "youtube" && isValidUrl && (
@@ -458,6 +439,10 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
                     height="100%"
                     controls={true}
                     light={true}
+                    onDuration={(duration) => {
+                      setMediaDuration(duration);
+                      setAudioDuration([0, Math.ceil(duration)]);
+                    }}
                   />
                 </div>
               )}
@@ -472,6 +457,14 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
                       height="152" 
                       frameBorder="0" 
                       allow="encrypted-media"
+                      onLoad={() => {
+                        // Set Spotify track duration when available in selectedTrack
+                        if (selectedTrack?.duration_ms) {
+                          const durationInSeconds = Math.ceil(selectedTrack.duration_ms / 1000);
+                          setMediaDuration(durationInSeconds);
+                          setAudioDuration([0, durationInSeconds]);
+                        }
+                      }}
                     ></iframe>
                   )}
                   {url.includes("spotify:track:") && (
@@ -481,8 +474,40 @@ export function FileUpload({ onFileSelect, onUrlSubmit }: FileUploadProps) {
                       height="152" 
                       frameBorder="0" 
                       allow="encrypted-media"
+                      onLoad={() => {
+                        // Set Spotify track duration when available in selectedTrack
+                        if (selectedTrack?.duration_ms) {
+                          const durationInSeconds = Math.ceil(selectedTrack.duration_ms / 1000);
+                          setMediaDuration(durationInSeconds);
+                          setAudioDuration([0, durationInSeconds]);
+                        }
+                      }}
                     ></iframe>
                   )}
+                </div>
+              )}
+              
+              {/* Time Range Selector - Only show when we have a YouTube or Spotify URL with duration */}
+              {(urlType === "youtube" || urlType === "spotify") && isValidUrl && mediaDuration > 0 && (
+                <div className="space-y-2 border-t border-dashed pt-3 mt-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Audio Time Range</span>
+                    </div>
+                    <span className="text-sm font-medium">{audioDuration[0].toFixed(1)} - {audioDuration[1].toFixed(1)} seconds</span>
+                  </div>
+                  <RangeSelector
+                    min={0}
+                    max={mediaDuration}
+                    defaultValue={audioDuration}
+                    onValueChange={(values) => setAudioDuration(values)}
+                    step={0.5}
+                    className="py-2"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Use the range selector to set audio start and end positions for conversion
+                  </p>
                 </div>
               )}
               
