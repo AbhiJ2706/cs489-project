@@ -8,6 +8,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import re
+import asyncio
+import logging
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -22,8 +24,14 @@ from app.routers.audio.operations import router as audio_router
 from app.routers.auth import router as auth_router
 from app.routers.scores import router as scores_router
 
-# Import and use our unified MuseScore path setup
+# Import utils
 from app.utils import setup_musescore_path
+from app.utils.cleanup import cleanup_old_files
+
+# Set up logger
+logger = logging.getLogger(__name__)
+
+# Setup MuseScore path
 setup_musescore_path()
 
 # Add PDF path setting
@@ -39,6 +47,44 @@ except:
 
 # Create FastAPI app
 app = FastAPI(title="DaScore API")
+
+# Background task for cleaning up old files
+background_tasks = set()
+
+@app.on_event("startup")
+async def startup_event():
+    """
+    Run startup tasks for the application.
+    """
+    # Start the periodic cleanup task
+    cleanup_task = asyncio.create_task(periodic_cleanup())
+    background_tasks.add(cleanup_task)
+    cleanup_task.add_done_callback(background_tasks.discard)
+    logger.info("Started background cleanup task")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """
+    Run shutdown tasks for the application.
+    """
+    # Cancel all background tasks
+    for task in background_tasks:
+        task.cancel()
+    logger.info("Cancelled background cleanup tasks")
+
+async def periodic_cleanup():
+    """
+    Periodically clean up old files.
+    """
+    while True:
+        try:
+            # Clean up files older than 24 hours
+            await cleanup_old_files(max_age_hours=24)
+        except Exception as e:
+            logger.error(f"Error during periodic cleanup: {e}")
+        
+        # Sleep for 1 hour before next cleanup
+        await asyncio.sleep(3600)
 
 # Get CORS origins from environment or use defaults
 cors_origins_str = os.getenv("CORS_ALLOW_ORIGINS", "https://www.visualize.music,http://localhost:3000,*")

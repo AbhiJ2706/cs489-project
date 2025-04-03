@@ -18,6 +18,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { LoadingScreen } from "@/components/loading";
+import SpotifyPlayer from "@/components/media/SpotifyPlayer";
 
 // Import ReactPlayer dynamically to avoid SSR issues
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
@@ -344,15 +345,7 @@ export default function UploadPage() {
             </h3>
 
             {trackId && (
-              <div className="rounded-md overflow-hidden aspect-video">
-                <iframe
-                  src={`https://open.spotify.com/embed/track/${trackId}`}
-                  width="100%"
-                  height="152"
-                  frameBorder="0"
-                  allow="encrypted-media"
-                ></iframe>
-              </div>
+              <SpotifyPlayer trackId={trackId} autoplay={true} />
             )}
 
             <div className="flex flex-col space-y-4">
@@ -436,15 +429,40 @@ export default function UploadPage() {
 
         {/* Loading Overlay with Snake Game */}
         {(isProcessingYoutube || isProcessingSpotify) && (
-          <LoadingScreen
+          <LoadingScreen 
             isLoading={true}
             progress={processingProgress}
-            message={isProcessingYoutube
-              ? "Converting YouTube audio to sheet music..."
+            message={isProcessingYoutube 
+              ? "Converting YouTube audio to sheet music..." 
               : "Converting Spotify track to sheet music..."
             }
             size="md"
             color="#10b981" // emerald-500
+            mediaPlayer={isProcessingYoutube ? (
+              <div className="aspect-video w-full">
+                <ReactPlayer
+                  url={youtubeUrl}
+                  width="100%"
+                  height="100%"
+                  controls={true}
+                  playing={true}
+                  volume={0.8}
+                />
+              </div>
+            ) : isProcessingSpotify && spotifyUrl ? (
+              <div className="h-[152px]">
+                <SpotifyPlayer 
+                  trackId={
+                    spotifyUrl.includes("spotify.com/track/") 
+                      ? spotifyUrl.split("spotify.com/track/")[1]?.split("?")[0] || ''
+                      : spotifyUrl.includes("spotify:track:") 
+                        ? spotifyUrl.split("spotify:track:")[1]?.split("?")[0] || ''
+                        : ''
+                  } 
+                  autoplay={true} 
+                />
+              </div>
+            ) : null}
           />
         )}
 

@@ -23,6 +23,7 @@ from app.config import TEMP_DIR, SOUNDFONT_PATH
 from app.wav_to_sheet_music import wav_to_sheet_music
 from app.musicxml_to_wav import musicxml_to_wav
 from app.utils import get_youtube_cookies_path
+from app.utils.cleanup import cleanup_temp_directory, cleanup_file_by_id
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -67,18 +68,17 @@ async def convert_youtube(
             'no_warnings': True,
             'cookiefile': get_youtube_cookies_path(),  # Use cookies file to bypass bot protection
             # Rate limiting to avoid triggering YouTube's anti-bot mechanisms
-            'ratelimit': 50 * 1024,  # 50K/s limit
-            'sleep_interval': 5,     # Sleep 5 seconds between requests
-            'sleep_interval_requests': 2,  # Sleep after every 2 requests
+            'ratelimit': 200 * 1024,  # 200K/s limit
+            'sleep_interval': 2,     # Sleep 2 seconds between requests
+            'sleep_interval_requests': 5,  # Sleep after every 5 requests
             'verbose': True,  # Enable verbose output for debugging
             # Extract audio only (equivalent to -x option)
             'extract_audio': True,
             'audio_format': 'wav',  # Convert directly to WAV format
             'audio_quality': '0',   # Highest quality (0-9, 0 is best)
-            # Use FFmpeg to trim audio to max_duration
-            'postprocessor_args': {
-                'ffmpeg': ['-t', str(max_duration)],
-            },
+            # Download only the first max_duration seconds (correct time range syntax)
+            # 'download_sections': f'*0-{max_duration}', # this is unreliable because youtube server doesn't always have accurate timestamps API error: 500 "{\"detail\":\"YouTube conversion failed: \\u001b[0;31mERROR:\\u001b[0m \\r[download] Got error: 1556480 bytes read, 228995 more expected\"}"
+            # 'force_keyframes_at_cuts': True,  # Ensure accurate cuts
         }
         
         # Variable to store the original audio duration
@@ -100,10 +100,62 @@ async def convert_youtube(
             # Get the downloaded file path - this should already be a WAV file
             downloaded_file = temp_dir / f"download.{info.get('ext', 'wav')}"
             
-            # Copy the downloaded WAV file to the expected location
+            # Check if the file exists and get its duration
             if downloaded_file.exists():
-                shutil.copy(downloaded_file, wav_path)
-                logger.info(f"Using downloaded WAV file: {wav_path}")
+                try:
+                    # Use FFprobe to get duration of the downloaded file
+                    result = subprocess.run([
+                        'ffprobe', 
+                        '-v', 'error', 
+                        '-show_entries', 'format=duration', 
+                        '-of', 'default=noprint_wrappers=1:nokey=1', 
+                        str(downloaded_file)
+                    ], capture_output=True, text=True, check=True)
+                    
+                    downloaded_duration = float(result.stdout.strip())
+                    logger.info(f"Downloaded file duration: {downloaded_duration} seconds")
+                    
+                    # Create a temporary file for the trimmed audio
+                    trimmed_file = temp_dir / "trimmed.wav"
+                    
+                    # Use FFmpeg to trim the audio to max_duration
+                    logger.info(f"Trimming audio to {max_duration} seconds")
+                    subprocess.run([
+                        'ffmpeg',
+                        '-i', str(downloaded_file),
+                        '-t', str(max_duration),
+                        '-ar', '44100',
+                        '-ac', '2',
+                        '-acodec', 'pcm_s16le',
+                        str(trimmed_file),
+                        '-y',
+                        '-loglevel', 'error'
+                    ], check=True)
+                    
+                    # If trimming was successful, copy to wav_path
+                    if trimmed_file.exists():
+                        shutil.copy(trimmed_file, wav_path)
+                        logger.info(f"Successfully trimmed WAV file to {max_duration} seconds: {wav_path}")
+                        
+                        # Get trimmed file duration for verification
+                        result = subprocess.run([
+                            'ffprobe', 
+                            '-v', 'error', 
+                            '-show_entries', 'format=duration', 
+                            '-of', 'default=noprint_wrappers=1:nokey=1', 
+                            str(wav_path)
+                        ], capture_output=True, text=True, check=True)
+                        
+                        trimmed_duration = float(result.stdout.strip())
+                        logger.info(f"Final trimmed file duration: {trimmed_duration} seconds")
+                    else:
+                        raise Exception("Failed to trim audio file")
+                        
+                except Exception as e:
+                    logger.error(f"Error processing audio: {str(e)}")
+                    # If trimming fails, use the original file (but this might be very long)
+                    shutil.copy(downloaded_file, wav_path)
+                    logger.info(f"Using original downloaded WAV file: {wav_path}")
             else:
                 logger.error(f"Downloaded file not found at: {downloaded_file}")
                 raise HTTPException(
@@ -164,25 +216,12 @@ async def convert_youtube(
         if not has_pdf:
             message += " (PDF generation failed, but MusicXML is available)"
         
-        # Extract thumbnail URL from YouTube video if available
-        thumbnail_url = None
-        try:
-            with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl:
-                info = ydl.extract_info(url, download=False)
-                thumbnails = info.get('thumbnails', [])
-                if thumbnails:
-                    # Get the highest quality thumbnail
-                    thumbnails.sort(key=lambda x: x.get('height', 0) * x.get('width', 0), reverse=True)
-                    thumbnail_url = thumbnails[0].get('url')
-        except Exception as e:
-            print(f"Error extracting thumbnail: {str(e)}")
-        
         # Create score generation record (with or without user)
         score_data = ScoreGenerationCreate(
             title=title,
             file_id=file_id,
             youtube_url=url,
-            thumbnail_url=thumbnail_url
+            thumbnail_url=None
         )
         
         # If user is authenticated, associate the score with the user
@@ -213,6 +252,9 @@ async def convert_youtube(
             if not message.endswith(")"): 
                 message += " (database record could not be saved)"
         
+        # Clean up temporary directory since we already have the processed files
+        cleanup_temp_directory(temp_dir)
+        
         return ConversionResult(
             file_id=file_id,
             message=message,
@@ -221,39 +263,14 @@ async def convert_youtube(
         )
     
     except Exception as e:
-        # Detailed error logging
-        logger.error(f"YouTube conversion failed with error: {str(e)}")
-        import traceback
-        logger.error(f"Full traceback: {traceback.format_exc()}")
+        # Clean up any generated files on error
+        logger.error(f"YouTube conversion failed: {e}")
         
-        # Log information about the state of files
-        logger.error(f"File status - WAV exists: {wav_path.exists()}, MusicXML exists: {musicxml_path.exists()}, PDF exists: {pdf_path.exists()}")
+        # Clean up the temporary directory
+        cleanup_temp_directory(temp_dir)
         
-        # Additional debugging info if available
-        if wav_path.exists():
-            try:
-                wav_size = wav_path.stat().st_size
-                logger.error(f"WAV file size: {wav_size} bytes")
-                if wav_size == 0:
-                    logger.error("WAV file is empty (0 bytes)")
-            except Exception as file_err:
-                logger.error(f"Error checking WAV file: {str(file_err)}")
-        
-        # Clean up any created files
-        for path in [wav_path, musicxml_path, pdf_path]:
-            if path.exists():
-                try:
-                    path.unlink()
-                    logger.info(f"Cleaned up file: {path}")
-                except Exception as cleanup_err:
-                    logger.error(f"Error cleaning up {path}: {str(cleanup_err)}")
-        
-        if temp_dir.exists():
-            try:
-                shutil.rmtree(temp_dir)
-                logger.info(f"Cleaned up temp directory: {temp_dir}")
-            except Exception as cleanup_err:
-                logger.error(f"Error cleaning up temp directory: {str(cleanup_err)}")
+        # Delete any generated files with this ID
+        cleanup_file_by_id(file_id)
         
         raise HTTPException(
             status_code=500,
@@ -471,6 +488,9 @@ async def convert_spotify(
             if not message.endswith(")"): 
                 message += " (database record could not be saved)"
         
+        # Clean up temporary directory since we already have the processed files
+        cleanup_temp_directory(temp_dir)
+        
         return ConversionResult(
             file_id=file_id,
             message=message,
@@ -479,12 +499,14 @@ async def convert_spotify(
         )
     
     except Exception as e:
-        # Clean up any created files
-        for path in [wav_path, musicxml_path, pdf_path]:
-            if path.exists():
-                path.unlink()
-        if temp_dir.exists():
-            shutil.rmtree(temp_dir)
+        # Clean up any generated files on error
+        logger.error(f"Spotify conversion failed: {e}")
+        
+        # Clean up the temporary directory
+        cleanup_temp_directory(temp_dir)
+        
+        # Delete any generated files with this ID
+        cleanup_file_by_id(file_id)
         
         raise HTTPException(
             status_code=500,
