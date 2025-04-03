@@ -5,6 +5,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import Link from "next/link";
 import { Music } from "lucide-react";
+import Image from "next/image";
 import { ClerkProviderWrapper } from "../components/auth/ClerkProviderWrapper";
 import { AuthButton } from "../components/auth/AuthComponent";
 
@@ -72,11 +73,16 @@ export default function RootLayout({
           <Providers>
             <div className="relative flex min-h-screen flex-col">
               {/* Global Navigation Header */}
-              <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="container flex h-14 items-center">
+              <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-2">
+                <div className="container flex h-14 items-center px-4">
                   <div className="mr-4 flex">
                     <Link href="/" className="flex items-center space-x-2">
-                      <Music className="h-6 w-6 text-primary" />
+                      <Image 
+                        src="/darklogo.svg" 
+                        alt="DaScore Logo" 
+                        width={32} 
+                        height={32} 
+                      />
                       <span className="font-bold">DaScore</span>
                     </Link>
                   </div>
