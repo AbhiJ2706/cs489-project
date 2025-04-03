@@ -13,8 +13,11 @@ export async function redirectToAuthCodeFlow(clientId: string): Promise<void> {
   const params = new URLSearchParams();
   params.append("client_id", clientId);
   params.append("response_type", "code");
-  params.append("redirect_uri", window.location.origin + "/callback");
-  params.append("scope", "user-read-private user-read-email playlist-read-private playlist-read-collaborative user-read-recently-played user-top-read");
+  params.append("redirect_uri", getRedirectUri());
+  params.append(
+    "scope",
+    "user-read-private user-read-email playlist-read-private playlist-read-collaborative user-read-recently-played user-top-read"
+  );
   params.append("code_challenge_method", "S256");
   params.append("code_challenge", challenge);
 
@@ -99,8 +102,8 @@ type ItemType = "artists" | "tracks";
 type TimeRange = "short_term" | "medium_term" | "long_term";
 
 export async function fetchTopItems(
-  type: ItemType = "tracks", 
-  timeRange: TimeRange = "medium_term", 
+  type: ItemType = "tracks",
+  timeRange: TimeRange = "medium_term",
   limit: number = 10,
   offset: number = 0
 ) {
@@ -117,7 +120,7 @@ export async function fetchTopItems(
 
   const response = await fetch(url.toString(), {
     method: "GET",
-    headers: { Authorization: `Bearer ${accessToken}` }
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
 
   if (!response.ok) {
