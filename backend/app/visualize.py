@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import find_peaks
 
-from process_audio import HOP_LENGTH, NOTE_NOISE_FLOOR_MULTIPLIER, __determine_start_end_frames, __determine_valid, __track_note_peaks, determine_potential_notes
+from app.process_audio import HOP_LENGTH, NOTE_NOISE_FLOOR_MULTIPLIER, __determine_start_end_frames, __determine_valid, __track_note_peaks, determine_potential_notes
 
 
 def find_valid_notes(audio_data, sample_rate, tempo, energy_map, noise_floor_threshold):

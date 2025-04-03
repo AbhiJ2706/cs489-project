@@ -71,9 +71,14 @@ async def convert_youtube(
             'sleep_interval': 5,     # Sleep 5 seconds between requests
             'sleep_interval_requests': 2,  # Sleep after every 2 requests
             'verbose': True,  # Enable verbose output for debugging
-            # Only download the section from beginning to max_duration
-            'download_sections': f'*0:{max_duration}',
-            'force_keyframes_at_cuts': True,  # Ensure accurate cuts
+            # Extract audio only (equivalent to -x option)
+            'extract_audio': True,
+            'audio_format': 'wav',  # Convert directly to WAV format
+            'audio_quality': '0',   # Highest quality (0-9, 0 is best)
+            # Use FFmpeg to trim audio to max_duration
+            'postprocessor_args': {
+                'ffmpeg': ['-t', str(max_duration)],
+            },
         }
         
         # Variable to store the original audio duration
@@ -92,57 +97,24 @@ async def convert_youtube(
             if not title:
                 title = info.get('title', 'YouTube Audio')
             
-            # Get the downloaded file path
-            downloaded_file = temp_dir / f"download.{info.get('ext', 'webm')}"
+            # Get the downloaded file path - this should already be a WAV file
+            downloaded_file = temp_dir / f"download.{info.get('ext', 'wav')}"
             
-            # Check if ffmpeg is available in the system
-            ffmpeg_available = True
-            try:
-                # Try to run a simple ffmpeg command to check if it's installed
-                subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
-            except (subprocess.SubprocessError, FileNotFoundError):
-                ffmpeg_available = False
-                print("Warning: ffmpeg executable not found in PATH")
+            # Copy the downloaded WAV file to the expected location
+            if downloaded_file.exists():
+                shutil.copy(downloaded_file, wav_path)
+                logger.info(f"Using downloaded WAV file: {wav_path}")
+            else:
+                logger.error(f"Downloaded file not found at: {downloaded_file}")
                 raise HTTPException(
                     status_code=500,
-                    detail="FFmpeg is not installed. Please install FFmpeg to use YouTube conversion."
+                    detail="Failed to download audio from YouTube."
                 )
-                
-            # Convert to WAV using ffmpeg
-            try:
-                # First try using the ffmpeg-python library
-                ffmpeg.input(str(downloaded_file)).output(
-                    str(wav_path), 
-                    ar=44100,    # Audio sample rate
-                    ac=2,        # Stereo audio
-                    acodec='pcm_s16le',  # 16-bit PCM encoding for WAV
-                ).overwrite_output().run(quiet=True, capture_stdout=True, capture_stderr=True)
-                
-                logger.info(f"Created WAV clip from YouTube audio: {wav_path}")
-            except Exception as e:
-                # If the ffmpeg-python library fails, fall back to subprocess if ffmpeg is available
-                print(f"FFmpeg-python error: {str(e)}")
-                if ffmpeg_available:
-                    subprocess.run([
-                        'ffmpeg', '-i', str(downloaded_file), 
-                        '-ar', '44100', '-ac', '2', 
-                        '-acodec', 'pcm_s16le',
-                        str(wav_path),
-                        '-y', '-loglevel', 'error'
-                    ], check=True)
-                    
-                    logger.info(f"Created WAV clip from YouTube audio using subprocess: {wav_path}")
-                else:
-                    raise HTTPException(
-                        status_code=500,
-                        detail="FFmpeg is not installed. Please install FFmpeg to use YouTube conversion."
-                    )
         
-        # Clean up downloaded file
-        if downloaded_file.exists():
-            downloaded_file.unlink()
-        if temp_dir.exists():
-            shutil.rmtree(temp_dir)
+        # Clean up downloaded files except the WAV we need
+        for file in temp_dir.glob("*"):
+            if file != wav_path and file.exists():
+                file.unlink()
         
         # Convert WAV to sheet music
         success = wav_to_sheet_music(
