@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import shutil
 import subprocess
 import traceback
 import warnings
@@ -67,25 +68,25 @@ def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, stem=
 
     if visualize_only:
         print("performing visualizations only")
-        output_image = os.path.splitext(
-            output_xml)[0] + "_visualization.png"
-        visualize_audio(preprocessed_audio, sample_rate, output_image, tempo_value[0])
+        output_image = os.path.splitext(output_xml)[0]
+        visualize_audio(preprocessed_audio, sample_rate,
+                        output_image, tempo_value[0])
         return
 
     print("Detecting notes...")
-    midi_data = detect_notes_and_chords(preprocessed_audio, sample_rate, tempo_value[0])
+    midi_data = detect_notes_and_chords(
+        preprocessed_audio, sample_rate, tempo_value[0])
 
     print("Converting to MusicXML...")
     score = midi_to_musicxml(
         midi_data, title=title, tp=tempo_value)
 
     print("Generating sheet music...")
-    success = generate_sheet_music(score, output_xml, output_pdf, messy=messy)
+    success = generate_sheet_music(score, output_xml, output_pdf, messy=messy, title=title)
 
     if visualize:
         print("Generating audio visualization...")
-        output_image = os.path.splitext(
-            output_xml)[0] + "_visualization.png"
+        output_image = os.path.splitext(output_xml)[0]
         visualize_audio(preprocessed_audio, sample_rate, output_image)
 
     if success:
@@ -117,6 +118,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if not os.path.isdir(f"out/{args.title.replace(' ', '_')}"):
+        os.mkdir(f"out/{args.title.replace(' ', '_')}")
+    else:
+        shutil.rmtree(f"out/{args.title.replace(' ', '_')}")
         os.mkdir(f"out/{args.title.replace(' ', '_')}")
 
     wav_to_sheet_music(

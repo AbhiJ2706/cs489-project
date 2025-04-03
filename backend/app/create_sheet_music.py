@@ -159,10 +159,10 @@ def __combine_rests_in_part(part, i):
     return new_part
 
 
-def __combine_rests_in_score(score):
+def __combine_rests_in_score(score, title):
     new_score = stream.Score()
     new_score.metadata = metadata.Metadata()
-    new_score.metadata.title = score.metadata.title
+    new_score.metadata.title = title
     for i, part in enumerate(score.getElementsByClass(stream.Part)):
         new_score.append(__combine_rests_in_part(part, i))
     return new_score
@@ -215,9 +215,6 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
         time_points = sorted(notes_by_time.keys())
 
         current_end_time = -1
-        gap = __convert_to_time(time_points[0] / (1 / (tp / 4) * 15))
-        treble_part.append(note.Rest(TIME_TO_REST[gap]))
-        bass_part.append(note.Rest(TIME_TO_REST[gap]))
 
         for time_point in time_points:
             notes_at_time = notes_by_time[time_point]
@@ -277,7 +274,7 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
     return score
 
 
-def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy=False):
+def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy=False, title=None):
     try:
         output_dir = os.path.dirname(output_xml)
         if output_dir and not os.path.exists(output_dir):
@@ -300,7 +297,7 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
         score.write('midi', fp=output_xml.replace("xml", "mid"))
         if not messy:
             xml_data = converter.parse(output_xml)
-            score = __combine_rests_in_score(xml_data)
+            score = __combine_rests_in_score(xml_data, title)
             score.write(fmt='musicxml', fp=output_xml)
             print(f"MusicXML file edited as: {output_xml}")
 
