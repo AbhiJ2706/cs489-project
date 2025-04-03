@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import subprocess
 import traceback
 import warnings
 
@@ -24,10 +25,24 @@ warnings.filterwarnings("ignore", message="PySoundFile failed.*")
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 
-def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, output_pdf=None):
+def stem_file(input):
+    subprocess.run(
+        ["python", "-m", "demucs", input],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    return f"separated/htdemucs/{input[:input.index(".wav")]}/other.wav"
+
+
+def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, stem=False, output_pdf=None, messy=False):
     print(f"Loading audio file: {input_wav}")
     try:
-        audio_data, sample_rate = load_audio_with_fallback(input_wav)
+        if stem:
+            new_filepath = stem_file(input_wav)
+            audio_data, sample_rate = load_audio_with_fallback(new_filepath)
+        else:
+            audio_data, sample_rate = load_audio_with_fallback(input_wav)
     except Exception as e:
         print(f"Error loading audio: {e}")
         print(f"Error details:\n{traceback.format_exc()}")
@@ -39,8 +54,9 @@ def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, outpu
     tempo_value, _ = librosa.beat.beat_track(y=audio_data, sr=sample_rate)
     print(f"""
           Detected tempo: {tempo_value} BPM, 
-          Length of a bar: {1 / (tempo_value[0] / 4) * 60}
-          Length of a quarter note: {1 / (tempo_value[0] / 4) * 15}
+          Length of a bar: {240 / tempo_value[0]}
+          Length of a quarter note: {60 / tempo_value[0]}
+          Length of a 16th note: {15 / tempo_value[0]}
     """)
 
     if title is None:
@@ -50,14 +66,14 @@ def wav_to_sheet_music(input_wav, output_xml, title=None, visualize=False, outpu
     preprocessed_audio = preprocess_audio(audio_data, sample_rate)
 
     print("Detecting notes...")
-    midi_data = detect_notes_and_chords(preprocessed_audio, sample_rate)
+    midi_data = detect_notes_and_chords(preprocessed_audio, sample_rate, tempo_value[0])
 
     print("Converting to MusicXML...")
     score = midi_to_musicxml(
         midi_data, title=title, tp=tempo_value)
 
     print("Generating sheet music...")
-    success = generate_sheet_music(score, output_xml, output_pdf)
+    success = generate_sheet_music(score, output_xml, output_pdf, messy=messy)
 
     if visualize:
         print("Generating audio visualization...")
@@ -84,6 +100,10 @@ if __name__ == "__main__":
                         help="Visualize the audio")
     parser.add_argument("--pdf", dest="output_pdf",
                         help="Path to save the output PDF file")
+    parser.add_argument("--stem", action="store_true",
+                        help="stem the audio")
+    parser.add_argument("--messy", action="store_true",
+                        help="turn off rest post-processing")
 
     args = parser.parse_args()
 
@@ -95,5 +115,7 @@ if __name__ == "__main__":
         f"out/{args.title.replace(' ', '_')}/{args.output_xml}",
         title=args.title,
         visualize=args.visualize,
+        stem=args.stem,
+        messy=args.messy,
         output_pdf=f"out/{args.title.replace(' ', '_')}/{args.output_pdf}"
     )

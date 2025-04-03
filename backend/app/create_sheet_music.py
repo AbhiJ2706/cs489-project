@@ -48,7 +48,7 @@ def __convert_to_time(note_duration):
     return min(TIME_TO_REST, key=lambda x: (note_duration - x) ** 2)
 
 
-def transform_nested_lists(list16, list8, list4, list2, list1):
+def __transform_nested_lists(list16, list8, list4, list2, list1):
     output_list = []
     i = 0
 
@@ -95,7 +95,10 @@ def transform_nested_lists(list16, list8, list4, list2, list1):
     return output_list
 
 
-def combine_rests_in_measure(measure):
+def __combine_rests_in_measure(measure):
+    if measure.duration.quarterLength < 4:
+        return None
+    
     new_measure = stream.Measure(number=measure.number)
 
     for ts in measure.getElementsByClass(meter.TimeSignature):
@@ -116,7 +119,7 @@ def combine_rests_in_measure(measure):
         note_masks.append(nnm)
         new_note_mask = nnm
     
-    tf = transform_nested_lists(*note_masks)
+    tf = __transform_nested_lists(*note_masks)
 
     locations = {}
     time = 0
@@ -138,7 +141,7 @@ def combine_rests_in_measure(measure):
     return new_measure
 
 
-def combine_rests_in_part(part, i):
+def __combine_rests_in_part(part, i):
     new_part = stream.Part()
 
     instrs = part.getElementsByClass(instrument.Instrument)
@@ -151,17 +154,17 @@ def combine_rests_in_part(part, i):
         new_part.append(clef.BassClef())
 
     for measure in part.getElementsByClass(stream.Measure):
-        new_part.append(combine_rests_in_measure(measure))
+        new_part.append(__combine_rests_in_measure(measure))
 
     return new_part
 
 
-def combine_rests_in_score(score):
+def __combine_rests_in_score(score):
     new_score = stream.Score()
     new_score.metadata = metadata.Metadata()
     new_score.metadata.title = score.metadata.title
     for i, part in enumerate(score.getElementsByClass(stream.Part)):
-        new_score.append(combine_rests_in_part(part, i))
+        new_score.append(__combine_rests_in_part(part, i))
     return new_score
 
 
@@ -269,10 +272,12 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120):
     score.append(treble_part)
     score.append(bass_part)
 
-    return score.makeMeasures()
+    score.makeMeasures(inPlace=True)
+    
+    return score
 
 
-def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None):
+def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy=False):
     try:
         output_dir = os.path.dirname(output_xml)
         if output_dir and not os.path.exists(output_dir):
@@ -293,10 +298,11 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None):
         score.write(fmt='musicxml', fp=output_xml, makeNotation=True)
         print(f"MusicXML file saved as: {output_xml}")
         score.write('midi', fp=output_xml.replace("xml", "mid"))
-        xml_data = converter.parse(output_xml)
-        score = combine_rests_in_score(xml_data)
-        score.write(fmt='musicxml', fp=output_xml)
-        print(f"MusicXML file edited as: {output_xml}")
+        if not messy:
+            xml_data = converter.parse(output_xml)
+            score = __combine_rests_in_score(xml_data)
+            score.write(fmt='musicxml', fp=output_xml)
+            print(f"MusicXML file edited as: {output_xml}")
 
         if output_pdf:
             try:
@@ -327,7 +333,7 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None):
 
 if __name__ == "__main__":
     xml_data = converter.parse("out/trial_blue/output1.xml")
-    combine_rests_in_score(xml_data).write(fmt='musicxml', fp="temp.xml")
+    __combine_rests_in_score(xml_data).write(fmt='musicxml', fp="temp.xml")
     subprocess.run(
         ["mscore", "-o", "temp.pdf", "temp.xml"],
         check=True,

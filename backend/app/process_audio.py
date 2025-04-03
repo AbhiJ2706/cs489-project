@@ -4,7 +4,7 @@ import noisereduce as nr
 import numpy as np
 import pretty_midi
 from pedalboard import Compressor, Gain, LowShelfFilter, NoiseGate, Pedalboard
-from scipy.signal import butter, filtfilt
+from scipy.signal import butter, filtfilt, find_peaks
 
 from .utils import setup_musescore_path
 
@@ -24,6 +24,7 @@ MIDI_MAX = librosa.note_to_midi('C8')
 
 ONSET_STRENGTH_THRESHOLD = 0.85
 SILENCE_THRESHOLD = 0.007
+PEAK_ENERGY_THRESHOLD = 0.5
 NOTE_NOISE_FLOOR_MULTIPLIER = 2
 
 TIME_TO_REST = {
@@ -101,7 +102,32 @@ def __determine_start_end_frames(start_time, end_time, audio_data, sample_rate, 
     return start_frame, end_frame, new_end_time
 
 
-def detect_notes_and_chords(audio_data, sample_rate):
+def __track_note_peaks(segment):
+    data = [find_peaks(x, height=0.7) for x in segment.T]
+    peaks = [d[0] for d in data]
+    energy = [d[1]['peak_heights'] for d in data]
+    peak_tracker = dict()
+    peak_energy = dict()
+    for i, (frame, frame_energy) in enumerate(zip(peaks, energy)):
+        for (item, e) in zip(frame, frame_energy):
+            peak_tracker[item] = peak_tracker.get(item, []) + [i]
+            peak_energy[item] = peak_energy.get(item, []) + [e]
+    result = []
+    for peak in peak_tracker:
+        if len(peak_tracker[peak]) > PEAK_ENERGY_THRESHOLD * segment.shape[1]:
+            result.append(peak)
+    # print("-------")
+    # print(512 * segment.shape[1] / 44100, result)
+    # print(peak_tracker)
+    # print(peak_energy)
+    return result
+
+
+def detect_notes_and_chords(audio_data, sample_rate, tempo):
+    min_note_duration_frames = (15 / tempo * sample_rate) // HOP_LENGTH + 1
+
+    print(f"min note duration in frames: {min_note_duration_frames}")
+
     midi_data = pretty_midi.PrettyMIDI()
 
     piano = pretty_midi.Instrument(program=0)
@@ -138,11 +164,8 @@ def detect_notes_and_chords(audio_data, sample_rate):
     onset_times = librosa.frames_to_time(
         onsets, sr=sample_rate, hop_length=HOP_LENGTH)
 
-    onset_times = np.append(onset_times, librosa.frames_to_time(
-        [200],
-        sr=sample_rate,
-        hop_length=HOP_LENGTH
-    ))
+    total_duration = librosa.get_duration(y=audio_data, sr=sample_rate)
+    onset_times = np.append(onset_times, total_duration)
 
     energy_map = librosa.feature.rms(
         y=audio_data, frame_length=HOP_LENGTH, hop_length=HOP_LENGTH).reshape(-1,)
@@ -153,7 +176,7 @@ def detect_notes_and_chords(audio_data, sample_rate):
         start_frame, end_frame, end_time = __determine_start_end_frames(
             onset_times[i], onset_times[i + 1], audio_data, sample_rate, C)
 
-        if start_frame >= end_frame:
+        if start_frame >= end_frame - min_note_duration_frames:
             continue
 
         if np.mean(energy_map[start_frame:end_frame]) <= noise_floor_threshold:
@@ -162,22 +185,21 @@ def detect_notes_and_chords(audio_data, sample_rate):
         segment = C[:, start_frame:end_frame]
 
         if segment.size > 0:
-            pitch_profile = np.sum(segment, axis=1)
+            pitch_peaks = __track_note_peaks(segment)
 
-            peak_bin = np.argmax(pitch_profile)
+            for peak in pitch_peaks:
+                midi_note = peak + MIDI_MIN
 
-            midi_note = peak_bin + MIDI_MIN
+                if MIDI_MIN <= midi_note <= MIDI_MAX:
+                    velocity = int(min(127, 40 + np.mean(segment) * 100))
+                    note = pretty_midi.Note(
+                        velocity=velocity,
+                        pitch=midi_note,
+                        start=onset_times[i],
+                        end=end_time
+                    )
 
-            if MIDI_MIN <= midi_note <= MIDI_MAX:
-                velocity = int(min(127, 40 + np.mean(segment) * 100))
-                note = pretty_midi.Note(
-                    velocity=velocity,
-                    pitch=midi_note,
-                    start=onset_times[i],
-                    end=end_time
-                )
-
-                piano.notes.append(note)
+                    piano.notes.append(note)
 
     midi_data.instruments.append(piano)
     midi_data = __quantize_notes(midi_data)
