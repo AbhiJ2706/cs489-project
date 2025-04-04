@@ -93,6 +93,9 @@ RUN wget -q -O musescore.appimage https://cdn.jsdelivr.net/musescore/v4.4.1/Muse
     chmod +x musescore.appimage && \
     ./musescore.appimage --appimage-extract && \
     rm musescore.appimage && \
+    # Move squashfs-root to a more predictable location
+    mv squashfs-root /opt/musescore && \
+    echo "MuseScore extracted to: $(ls -la /opt/musescore/bin)" && \
     # Create a wrapper script for MuseScore
     echo '#!/bin/bash\n\
 export DISPLAY=:99\n\
@@ -100,7 +103,7 @@ Xvfb :99 -screen 0 1280x1024x24 -ac +extension GLX +render -noreset & \n\
 XVFB_PID=$!\n\
 sleep 3\n\
 # Give Xvfb time to start\n\
-MSCORE_PATH="/app/squashfs-root/bin/mscore4portable"\n\
+MSCORE_PATH="/opt/musescore/bin/mscore4portable"\n\
 echo "Running MuseScore command: $MSCORE_PATH $*"\n\
 timeout 90 $MSCORE_PATH "$@"\n\
 EXIT_CODE=$?\n\
@@ -110,7 +113,10 @@ if [ $EXIT_CODE -ne 0 ]; then\n\
 fi\n\
 exit $EXIT_CODE' > /usr/local/bin/mscore && \
     chmod +x /usr/local/bin/mscore && \
+    # Verify the directory exists and has content
+    ls -la /opt/musescore/bin/ && \
     # Test that it works - but don't fail the build if it doesn't
+    echo "Testing MuseScore wrapper script..." && \
     mscore --version || echo "MuseScore test may fail during build, but should work in runtime"
 
 # Make setup script executable

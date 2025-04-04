@@ -481,7 +481,8 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                 mscore_paths = [
                     'mscore',
                     '/usr/local/bin/mscore',  # Docker wrapper script
-                    '/app/squashfs-root/bin/mscore4portable',  # Direct AppImage extracted path
+                    '/opt/musescore/bin/mscore4portable',  # Updated AppImage path
+                    '/app/squashfs-root/bin/mscore4portable',  # Old AppImage path (fallback)
                     music21_path  # From music21 settings
                 ]
                 
@@ -559,7 +560,8 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                         mscore_paths = [
                             'mscore',
                             '/usr/local/bin/mscore',  # Docker wrapper script
-                            '/app/squashfs-root/bin/mscore4portable',  # Direct AppImage extracted path
+                            '/opt/musescore/bin/mscore4portable',  # Updated AppImage path
+                            '/app/squashfs-root/bin/mscore4portable',  # Old AppImage path (fallback)
                             music21_path  # From music21 settings
                         ]
                         
