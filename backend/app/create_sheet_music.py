@@ -15,6 +15,18 @@ import numpy as np
 # Initialize MuseScore path
 setup_musescore_path()
 
+# Print the UserSettings for debugging
+try:
+    us = environment.UserSettings()
+    logger.info(f"Available UserSettings keys: {sorted(us.keys())}")
+    logger.info(f"musicxmlPath in settings: {'musicxmlPath' in us.keys()}")
+    try:
+        logger.info(f"Current musicxmlPath: {us['musicxmlPath']}")
+    except KeyError:
+        logger.info("musicxmlPath not set in UserSettings")
+except Exception as e:
+    logger.error(f"Error accessing UserSettings: {e}")
+
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,
@@ -462,10 +474,10 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                 
                 # Check if musicxmlPath exists in settings
                 music21_path = None
-                if 'musicxmlPath' in us:
+                try:
                     music21_path = us['musicxmlPath']
                     logger.info(f"Found music21 mscore path: {music21_path}")
-                else:
+                except KeyError:
                     logger.warning("No musicxmlPath found in music21 settings")
                 
                 # Try to use direct path for Docker environment
@@ -511,10 +523,10 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                         
                         # Check if musicxmlPath exists in settings
                         music21_path = None
-                        if 'musicxmlPath' in us:
+                        try:
                             music21_path = us['musicxmlPath']
                             logger.info(f"Found music21 mscore path (fallback): {music21_path}")
-                        else:
+                        except KeyError:
                             logger.warning("No musicxmlPath found in music21 settings (fallback)")
                         
                         # Try all possible paths for mscore in fallback mode
