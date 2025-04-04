@@ -457,11 +457,22 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                 tree.write(output_xml)
                 logger.info(f"Manually corrected metadata in XML file: Title='{original_title}', Composer='{original_composer}'")
                 
+                # Get environment settings
+                us = environment.UserSettings()
+                
+                # Check if musicxmlPath exists in settings
+                music21_path = None
+                if 'musicxmlPath' in us:
+                    music21_path = us['musicxmlPath']
+                    logger.info(f"Found music21 mscore path: {music21_path}")
+                else:
+                    logger.warning("No musicxmlPath found in music21 settings")
+                
                 # Try to use direct path for Docker environment
                 mscore_paths = [
                     '/usr/local/bin/mscore',  # Docker wrapper script
                     '/app/squashfs-root/bin/mscore4portable',  # Direct AppImage extracted path
-                    env['musicxmlPath'] if 'musicxmlPath' in env else None  # From music21 settings
+                    music21_path  # From music21 settings
                 ]
                 
                 success = False
@@ -495,11 +506,22 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                     print("the error may have been caused by rest correction. falling back to uncorrected score.")
                     try:
                         score.write(fmt='musicxml', fp=output_xml, makeNotation=True)
+                        # Get environment settings for fallback
+                        us = environment.UserSettings()
+                        
+                        # Check if musicxmlPath exists in settings
+                        music21_path = None
+                        if 'musicxmlPath' in us:
+                            music21_path = us['musicxmlPath']
+                            logger.info(f"Found music21 mscore path (fallback): {music21_path}")
+                        else:
+                            logger.warning("No musicxmlPath found in music21 settings (fallback)")
+                        
                         # Try all possible paths for mscore in fallback mode
                         mscore_paths = [
                             '/usr/local/bin/mscore',  # Docker wrapper script
                             '/app/squashfs-root/bin/mscore4portable',  # Direct AppImage extracted path
-                            env['musicxmlPath'] if 'musicxmlPath' in env else None  # From music21 settings
+                            music21_path  # From music21 settings
                         ]
                         
                         success = False
