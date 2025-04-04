@@ -100,8 +100,9 @@ Xvfb :99 -screen 0 1280x1024x24 -ac +extension GLX +render -noreset & \n\
 XVFB_PID=$!\n\
 sleep 3\n\
 # Give Xvfb time to start\n\
-echo "Running MuseScore command: squashfs-root/bin/mscore4portable $*"\n\
-timeout 90 squashfs-root/bin/mscore4portable "$@"\n\
+MSCORE_PATH="/app/squashfs-root/bin/mscore4portable"\n\
+echo "Running MuseScore command: $MSCORE_PATH $*"\n\
+timeout 90 $MSCORE_PATH "$@"\n\
 EXIT_CODE=$?\n\
 kill $XVFB_PID || true\n\
 if [ $EXIT_CODE -ne 0 ]; then\n\
