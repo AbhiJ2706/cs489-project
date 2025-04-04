@@ -22,6 +22,31 @@ def setup_musescore_path():
     # macOS path (local development)
     macos_path = '/Applications/MuseScore 4.app/Contents/MacOS/mscore'
     
+    # Debug all paths
+    for path in ['/usr/local/bin/mscore', 'mscore', '/app/squashfs-root/bin/mscore4portable']:
+        if os.path.exists(path):
+            file_stats = os.stat(path)
+            is_executable = bool(file_stats.st_mode & 0o111)
+            logger.info(f"Checking path: {path} - Exists: True, Executable: {is_executable}, Size: {file_stats.st_size} bytes")
+            
+            # If it's a script (small file), try to read it
+            if file_stats.st_size < 5000:
+                try:
+                    with open(path, 'r') as f:
+                        content = f.read(500)
+                        logger.info(f"Script content: {content[:200]}...")
+                except Exception as e:
+                    logger.warning(f"Could not read file {path}: {e}")
+        else:
+            logger.info(f"Checking path: {path} - Exists: False")
+    
+    # Try to debug $PATH
+    try:
+        path_env = os.environ.get('PATH', '')
+        logger.info(f"Environment PATH: {path_env}")
+    except Exception as e:
+        logger.warning(f"Could not get PATH environment: {e}")
+    
     if os.path.exists(docker_path):
         mscore_path = docker_path
         logger.info(f"Using Docker MuseScore path: {mscore_path}")

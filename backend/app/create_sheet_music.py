@@ -479,6 +479,7 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                 
                 # Try to use direct path for Docker environment
                 mscore_paths = [
+                    'mscore',
                     '/usr/local/bin/mscore',  # Docker wrapper script
                     '/app/squashfs-root/bin/mscore4portable',  # Direct AppImage extracted path
                     music21_path  # From music21 settings
@@ -488,20 +489,48 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                 for path in mscore_paths:
                     if not path:
                         continue
+                    
+                    # Debug file existence and permissions
+                    if os.path.exists(path):
+                        file_stats = os.stat(path)
+                        is_executable = bool(file_stats.st_mode & 0o111)
+                        logger.info(f"Path {path} exists. Executable: {is_executable}, Size: {file_stats.st_size} bytes")
+                        
+                        # Try to read file contents if it's small enough
+                        if file_stats.st_size < 10000:  # Only read if file is small
+                            try:
+                                with open(path, 'r') as f:
+                                    content = f.read(1000)  # Read first 1000 chars
+                                    logger.info(f"File content preview: {content[:200]}...")
+                            except Exception as read_err:
+                                logger.warning(f"Could not read file: {read_err}")
+                    else:
+                        logger.warning(f"Path does not exist: {path}")
+                    
+                    # Try to get directory listing
+                    try:
+                        if os.path.isdir(os.path.dirname(path)):
+                            dir_listing = os.listdir(os.path.dirname(path))
+                            logger.info(f"Directory contents of {os.path.dirname(path)}: {dir_listing[:10]}{'...' if len(dir_listing) > 10 else ''}")
+                    except Exception as dir_err:
+                        logger.warning(f"Could not list directory: {dir_err}")
                         
                     try:
                         logger.info(f"Attempting to use MuseScore at: {path}")
-                        subprocess.run(
+                        result = subprocess.run(
                             [path, "-o", output_pdf, output_xml],
                             check=True,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE
                         )
                         logger.info(f"PDF successfully created using: {path}")
+                        logger.info(f"Command stdout: {result.stdout.decode('utf-8', errors='replace')[:200]}")
                         success = True
                         break
                     except (subprocess.CalledProcessError, FileNotFoundError) as e:
                         logger.warning(f"Failed with {path}: {e}")
+                        if hasattr(e, 'stderr') and e.stderr:
+                            logger.warning(f"Command stderr: {e.stderr.decode('utf-8', errors='replace')[:200]}")
                         continue
                 
                 if not success:
@@ -528,6 +557,7 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                         
                         # Try all possible paths for mscore in fallback mode
                         mscore_paths = [
+                            'mscore',
                             '/usr/local/bin/mscore',  # Docker wrapper script
                             '/app/squashfs-root/bin/mscore4portable',  # Direct AppImage extracted path
                             music21_path  # From music21 settings
@@ -537,20 +567,48 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                         for path in mscore_paths:
                             if not path:
                                 continue
+                            
+                            # Debug file existence and permissions (fallback)
+                            if os.path.exists(path):
+                                file_stats = os.stat(path)
+                                is_executable = bool(file_stats.st_mode & 0o111)
+                                logger.info(f"Path {path} exists (fallback). Executable: {is_executable}, Size: {file_stats.st_size} bytes")
+                                
+                                # Try to read file contents if it's small enough
+                                if file_stats.st_size < 10000:  # Only read if file is small
+                                    try:
+                                        with open(path, 'r') as f:
+                                            content = f.read(1000)  # Read first 1000 chars
+                                            logger.info(f"File content preview (fallback): {content[:200]}...")
+                                    except Exception as read_err:
+                                        logger.warning(f"Could not read file (fallback): {read_err}")
+                            else:
+                                logger.warning(f"Path does not exist (fallback): {path}")
+                            
+                            # Try to get directory listing
+                            try:
+                                if os.path.isdir(os.path.dirname(path)):
+                                    dir_listing = os.listdir(os.path.dirname(path))
+                                    logger.info(f"Directory contents of {os.path.dirname(path)} (fallback): {dir_listing[:10]}{'...' if len(dir_listing) > 10 else ''}")
+                            except Exception as dir_err:
+                                logger.warning(f"Could not list directory (fallback): {dir_err}")
                                 
                             try:
                                 logger.info(f"Attempting to use MuseScore at (fallback): {path}")
-                                subprocess.run(
+                                result = subprocess.run(
                                     [path, "-o", output_pdf, output_xml],
                                     check=True,
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE
                                 )
                                 logger.info(f"PDF successfully created using (fallback): {path}")
+                                logger.info(f"Command stdout (fallback): {result.stdout.decode('utf-8', errors='replace')[:200]}")
                                 success = True
                                 break
                             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                                 logger.warning(f"Failed with {path} (fallback): {e}")
+                                if hasattr(e, 'stderr') and e.stderr:
+                                    logger.warning(f"Command stderr (fallback): {e.stderr.decode('utf-8', errors='replace')[:200]}")
                                 continue
                         
                         if not success:
