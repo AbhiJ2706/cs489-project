@@ -15,13 +15,9 @@ from load_audio import load_audio_with_fallback
 from process_audio import detect_notes_and_chords, preprocess_audio
 from visualize import visualize_audio
 
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-logger = logging.getLogger(__name__)
+# Get logger
+from utils.logger import get_logger
+logger = get_logger(__name__)
 
 # Initialize MuseScore path
 setup_musescore_path()

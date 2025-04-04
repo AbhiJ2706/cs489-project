@@ -9,8 +9,12 @@ from music21 import (clef, duration, instrument, metadata,
                      meter, note, stream, tempo, tie, converter, chord)
 
 from utils import setup_musescore_path
+from utils.logger import get_logger
 from music21 import environment
 import numpy as np
+
+# Get logger
+logger = get_logger(__name__)
 
 # Initialize MuseScore path
 setup_musescore_path()
@@ -27,13 +31,6 @@ try:
 except Exception as e:
     logger.error(f"Error accessing UserSettings: {e}")
 
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-logger = logging.getLogger(__name__)
 
 LOW_FREQUENCY = 25
 HIGH_FREQEUNCY = 4200

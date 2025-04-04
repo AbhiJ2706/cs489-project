@@ -10,8 +10,9 @@ from pathlib import Path
 
 from config import TEMP_DIR
 
-# Set up logger
-logger = logging.getLogger(__name__)
+# Get logger
+from utils.logger import get_logger
+logger = get_logger(__name__)
 
 def cleanup_temp_directory(temp_dir: Path):
     """

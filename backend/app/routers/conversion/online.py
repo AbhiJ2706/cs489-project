@@ -25,8 +25,9 @@ from musicxml_to_wav import musicxml_to_wav
 from utils import get_youtube_cookies_path
 from utils.cleanup import cleanup_temp_directory, cleanup_file_by_id
 
-# Set up logger
-logger = logging.getLogger(__name__)
+# Get logger
+from utils.logger import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(tags=["conversion"])
 

@@ -20,8 +20,9 @@ from config import TEMP_DIR, SOUNDFONT_PATH
 from wav_to_sheet_music import wav_to_sheet_music
 from musicxml_to_wav import musicxml_to_wav
 
-# Set up logger
-logger = logging.getLogger(__name__)
+# Get logger
+from utils.logger import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/convert", tags=["conversion"])
 
