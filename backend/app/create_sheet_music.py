@@ -457,17 +457,35 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                 tree.write(output_xml)
                 logger.info(f"Manually corrected metadata in XML file: Title='{original_title}', Composer='{original_composer}'")
                 
-                # Get the proper mscore path from music21 environment
-                env = environment.UserSettings()
-                mscore_path = env['musicxmlPath']
-                logger.info(f"Using MuseScore path from environment: {mscore_path}")
+                # Try to use direct path for Docker environment
+                mscore_paths = [
+                    '/usr/local/bin/mscore',  # Docker wrapper script
+                    '/app/squashfs-root/bin/mscore4portable',  # Direct AppImage extracted path
+                    env['musicxmlPath'] if 'musicxmlPath' in env else None  # From music21 settings
+                ]
                 
-                subprocess.run(
-                    [mscore_path, "-o", output_pdf, output_xml],
-                    check=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
+                success = False
+                for path in mscore_paths:
+                    if not path:
+                        continue
+                        
+                    try:
+                        logger.info(f"Attempting to use MuseScore at: {path}")
+                        subprocess.run(
+                            [path, "-o", output_pdf, output_xml],
+                            check=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE
+                        )
+                        logger.info(f"PDF successfully created using: {path}")
+                        success = True
+                        break
+                    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                        logger.warning(f"Failed with {path}: {e}")
+                        continue
+                
+                if not success:
+                    raise Exception("All MuseScore paths failed")
                 logger.info(f"PDF file created: {output_pdf}")
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 print(f"Warning: Could not generate PDF. Error: {e}")
@@ -477,17 +495,35 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                     print("the error may have been caused by rest correction. falling back to uncorrected score.")
                     try:
                         score.write(fmt='musicxml', fp=output_xml, makeNotation=True)
-                        # Get the proper mscore path from music21 environment
-                        env = environment.UserSettings()
-                        mscore_path = env['musicxmlPath']
-                        logger.info(f"Using MuseScore path from environment (fallback): {mscore_path}")
+                        # Try all possible paths for mscore in fallback mode
+                        mscore_paths = [
+                            '/usr/local/bin/mscore',  # Docker wrapper script
+                            '/app/squashfs-root/bin/mscore4portable',  # Direct AppImage extracted path
+                            env['musicxmlPath'] if 'musicxmlPath' in env else None  # From music21 settings
+                        ]
                         
-                        subprocess.run(
-                            [mscore_path, "-o", output_pdf, output_xml],
-                            check=True,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE
-                        )
+                        success = False
+                        for path in mscore_paths:
+                            if not path:
+                                continue
+                                
+                            try:
+                                logger.info(f"Attempting to use MuseScore at (fallback): {path}")
+                                subprocess.run(
+                                    [path, "-o", output_pdf, output_xml],
+                                    check=True,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE
+                                )
+                                logger.info(f"PDF successfully created using (fallback): {path}")
+                                success = True
+                                break
+                            except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                                logger.warning(f"Failed with {path} (fallback): {e}")
+                                continue
+                        
+                        if not success:
+                            raise Exception("All MuseScore paths failed in fallback mode")
                         print(f"PDF file saved as: {output_pdf}")
                     except (subprocess.CalledProcessError, FileNotFoundError) as e:
                         print(f"Warning: Could not generate PDF. Error: {e}")
