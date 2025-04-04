@@ -457,8 +457,13 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                 tree.write(output_xml)
                 logger.info(f"Manually corrected metadata in XML file: Title='{original_title}', Composer='{original_composer}'")
                 
+                # Get the proper mscore path from music21 environment
+                env = environment.Environment()
+                mscore_path = env.get('musicxmlPath')
+                logger.info(f"Using MuseScore path from environment: {mscore_path}")
+                
                 subprocess.run(
-                    ["mscore", "-o", output_pdf, output_xml],
+                    [mscore_path, "-o", output_pdf, output_xml],
                     check=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE
@@ -472,8 +477,13 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                     print("the error may have been caused by rest correction. falling back to uncorrected score.")
                     try:
                         score.write(fmt='musicxml', fp=output_xml, makeNotation=True)
+                        # Get the proper mscore path from music21 environment
+                        env = environment.Environment()
+                        mscore_path = env.get('musicxmlPath')
+                        logger.info(f"Using MuseScore path from environment (fallback): {mscore_path}")
+                        
                         subprocess.run(
-                            ["mscore", "-o", output_pdf, output_xml],
+                            [mscore_path, "-o", output_pdf, output_xml],
                             check=True,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE
