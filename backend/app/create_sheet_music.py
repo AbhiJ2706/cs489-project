@@ -458,8 +458,8 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                 logger.info(f"Manually corrected metadata in XML file: Title='{original_title}', Composer='{original_composer}'")
                 
                 # Get the proper mscore path from music21 environment
-                env = environment.Environment()
-                mscore_path = env.get('musicxmlPath')
+                env = environment.UserSettings()
+                mscore_path = env['musicxmlPath']
                 logger.info(f"Using MuseScore path from environment: {mscore_path}")
                 
                 subprocess.run(
@@ -478,8 +478,8 @@ def generate_sheet_music(score: stream.Score, output_xml, output_pdf=None, messy
                     try:
                         score.write(fmt='musicxml', fp=output_xml, makeNotation=True)
                         # Get the proper mscore path from music21 environment
-                        env = environment.Environment()
-                        mscore_path = env.get('musicxmlPath')
+                        env = environment.UserSettings()
+                        mscore_path = env['musicxmlPath']
                         logger.info(f"Using MuseScore path from environment (fallback): {mscore_path}")
                         
                         subprocess.run(
