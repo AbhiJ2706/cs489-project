@@ -2,14 +2,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    domains: [
-      "i.ytimg.com",
-      "i.scdn.co",
-      "mosaic.scdn.co",
-      "scontent-prg1-1.xx.fbcdn.net",
-      "platform-lookaside.fbsbx.com",
-      "scontent.xx.fbcdn.net",
-      "image-cdn-fa.spotify.com",
+    remotePatterns: [
+      { protocol: "https", hostname: "i.ytimg.com" },
+      { protocol: "https", hostname: "i.scdn.co" },
+      { protocol: "https", hostname: "mosaic.scdn.co" },
+      { protocol: "https", hostname: "*.fbcdn.net" },  // This covers all Facebook CDN subdomains
+      { protocol: "https", hostname: "platform-lookaside.fbsbx.com" },
+      { protocol: "https", hostname: "image-cdn-fa.spotify.com" },
     ],
   },
   experimental: {

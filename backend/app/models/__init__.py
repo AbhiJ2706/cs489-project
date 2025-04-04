@@ -8,4 +8,4 @@ from models.auth import User
 from models.score import ScoreGeneration
 
 # Import all your models here so Alembic can discover them
-# Example: from app.models.some_model import SomeModel
+# Example: from models.some_model import SomeModel

@@ -22,7 +22,7 @@ class ScoreGeneration(BaseModel, table=True):
     user_id: Optional[int] = Field(default=None, foreign_key="user.id")
     
     # Relationships
-    user: Optional["app.models.auth.User"] = Relationship(back_populates="score_generations", sa_relationship_kwargs={"lazy": "selectin"})
+    user: Optional["models.auth.User"] = Relationship(back_populates="score_generations", sa_relationship_kwargs={"lazy": "selectin"})
     
 class ScoreGenerationCreate(SQLModel):
     """Schema for creating a score generation."""

@@ -18,4 +18,4 @@ class User(BaseModel, table=True):
     google_id: str = Field(unique=True, index=True)
     
     # Relationships
-    score_generations: List["app.models.score.ScoreGeneration"] = Relationship(back_populates="user", sa_relationship_kwargs={"lazy": "selectin"})
+    score_generations: List["models.score.ScoreGeneration"] = Relationship(back_populates="user", sa_relationship_kwargs={"lazy": "selectin"})

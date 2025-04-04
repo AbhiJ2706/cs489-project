@@ -9,6 +9,8 @@ import Image from "next/image";
 import { ClerkProviderWrapper } from "../components/auth/ClerkProviderWrapper";
 import { AuthButton } from "../components/auth/AuthComponent";
 
+
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -75,43 +77,87 @@ export default function RootLayout({
             <div className="relative flex min-h-screen flex-col">
               {/* Global Navigation Header */}
               <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-2">
-                <div className="container flex h-14 items-center px-4">
-                  <div className="mr-4 flex">
-                    <Link href="/" className="flex items-center space-x-2">
-                      <Image
-                        src="/darklogo.png"
-                        alt="DaScore Logo"
-                        width={32}
-                        height={32}
-                      />
-                      <span className="font-bold">DaScore</span>
-                    </Link>
-                  </div>
-                  <nav className="flex flex-1 items-center justify-between">
-                    <div className="flex items-center gap-6 text-sm">
-                      <Link
-                        href="/"
-                        className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
-                      >
-                        Home
-                      </Link>
-                      <Link
-                        href="/upload"
-                        className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
-                      >
-                        Convert Audio
-                      </Link>
-                      <Link
-                        href="/roadmap"
-                        className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
-                      >
-                        Roadmap
+                <div className="flex h-14 items-center justify-between w-full px-0 max-w-full">
+                  {/* Left: Logo and Navigation */}
+                  <div className="flex items-center gap-6 pl-4">
+                    {/* Logo */}
+                    <div className="flex-shrink-0">
+                      <Link href="/" className="flex items-center space-x-2">
+                        <Image
+                          src="/darklogo.png"
+                          alt="DaScore Logo"
+                          width={32}
+                          height={32}
+                        />
+                        <span className="font-bold">DaScore</span>
                       </Link>
                     </div>
-                    <div className="ml-auto">
+                    
+                    {/* Desktop Navigation */}
+                    <nav className="hidden md:flex items-center gap-6 text-sm">
+                    <Link
+                      href="/"
+                      className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
+                    >
+                      Home
+                    </Link>
+                    <Link
+                      href="/upload"
+                      className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
+                    >
+                      Convert Audio
+                    </Link>
+                    <Link
+                      href="/roadmap"
+                      className="transition-colors hover:text-foreground/80 text-foreground/60 hover:text-foreground"
+                    >
+                      Roadmap
+                    </Link>
+                    </nav>
+                  </div>
+                  
+                  {/* Right Side: Auth Button & Mobile Menu */}
+                  <div className="flex items-center">
+                    {/* Desktop Auth Button */}
+                    <div className="hidden md:block pr-4">
                       <AuthButton />
                     </div>
-                  </nav>
+                    
+                    {/* Mobile Menu (CSS-only approach) */}
+                    <div className="md:hidden relative">
+                      <input type="checkbox" id="mobile-menu-toggle" className="hidden peer" />
+                      <label htmlFor="mobile-menu-toggle" className="flex h-9 w-9 items-center justify-center rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground cursor-pointer">
+                        <svg className="peer-checked:hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="4" x2="20" y1="12" y2="12"></line>
+                          <line x1="4" x2="20" y1="6" y2="6"></line>
+                          <line x1="4" x2="20" y1="18" y2="18"></line>
+                        </svg>
+                        <svg className="hidden peer-checked:block" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 6 6 18"></path>
+                          <path d="m6 6 12 12"></path>
+                        </svg>
+                      </label>
+                      <div className="fixed inset-0 top-[60px] z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 hidden peer-checked:block">
+                        <div className="container py-6 px-4 flex flex-col gap-6">
+                          <nav className="flex flex-col space-y-4 text-base">
+                            <Link href="/" className="flex py-2 text-foreground/70 hover:text-foreground transition-colors">
+                              Home
+                            </Link>
+                            <Link href="/upload" className="flex py-2 text-foreground/70 hover:text-foreground transition-colors">
+                              Convert Audio
+                            </Link>
+                            <Link href="/roadmap" className="flex py-2 text-foreground/70 hover:text-foreground transition-colors">
+                              Roadmap
+                            </Link>
+                          </nav>
+                          
+                          <div className="pt-4 border-t">
+                            <AuthButton />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </header>
               <div className="flex-1">
