@@ -5,8 +5,8 @@ Audio operations endpoints.
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
-from app.config import TEMP_DIR, SOUNDFONT_PATH
-from app.musicxml_to_wav import musicxml_to_wav
+from config import TEMP_DIR, SOUNDFONT_PATH
+from musicxml_to_wav import musicxml_to_wav
 
 router = APIRouter(tags=["audio"])
 

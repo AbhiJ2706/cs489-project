@@ -7,10 +7,10 @@ from sqlmodel import Session, select
 from sqlalchemy import desc
 from datetime import datetime
 
-from app.db.config import get_session
-from app.models.auth import User
-from app.models.score import ScoreGeneration, ScoreGenerationCreate, ScoreGenerationRead
-from app.routers.auth import get_current_user, get_optional_user
+from db.config import get_session
+from models.auth import User
+from models.score import ScoreGeneration, ScoreGenerationCreate, ScoreGenerationRead
+from routers.auth import get_current_user, get_optional_user
 
 router = APIRouter(tags=["scores"])
 

@@ -14,16 +14,16 @@ from typing import Optional
 from sqlmodel import Session
 from fastapi import APIRouter, Depends, HTTPException, Response
 
-from app.models.schemas import ConversionResult, YouTubeUrl, SpotifyUrl, GenericUrl
-from app.models.auth import User
-from app.models.score import ScoreGeneration, ScoreGenerationCreate
-from app.db.config import get_session
-from app.routers.auth import get_optional_user
-from app.config import TEMP_DIR, SOUNDFONT_PATH
-from app.wav_to_sheet_music import wav_to_sheet_music
-from app.musicxml_to_wav import musicxml_to_wav
-from app.utils import get_youtube_cookies_path
-from app.utils.cleanup import cleanup_temp_directory, cleanup_file_by_id
+from models.schemas import ConversionResult, YouTubeUrl, SpotifyUrl, GenericUrl
+from models.auth import User
+from models.score import ScoreGeneration, ScoreGenerationCreate
+from db.config import get_session
+from routers.auth import get_optional_user
+from config import TEMP_DIR, SOUNDFONT_PATH
+from wav_to_sheet_music import wav_to_sheet_music
+from musicxml_to_wav import musicxml_to_wav
+from utils import get_youtube_cookies_path
+from utils.cleanup import cleanup_temp_directory, cleanup_file_by_id
 
 # Set up logger
 logger = logging.getLogger(__name__)

@@ -10,8 +10,8 @@ from sqlmodel import Session, select
 from jose import JWTError, jwt
 from pydantic import BaseModel
 
-from app.db.config import get_session
-from app.models.auth import User
+from db.config import get_session
+from models.auth import User
 
 # JWT configuration
 SECRET_KEY = "your-secret-key-here"  # In production, use environment variable

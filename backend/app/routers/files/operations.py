@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 
-from app.config import TEMP_DIR
+from config import TEMP_DIR
 
 router = APIRouter(tags=["files"])
 

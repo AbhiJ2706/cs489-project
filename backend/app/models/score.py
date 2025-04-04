@@ -6,10 +6,10 @@ from sqlmodel import Field, Relationship, SQLModel
 from pydantic import HttpUrl
 from datetime import datetime
 
-from app.models.base import BaseModel
+from models.base import BaseModel
 
 # Import User at runtime to avoid circular import issues
-from app.models.auth import User
+from models.auth import User
 
 class ScoreGeneration(BaseModel, table=True):
     """Model for storing score sheet generations."""

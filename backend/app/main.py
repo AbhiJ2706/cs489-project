@@ -16,17 +16,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import routers
-from app.routers.home import router as home_router
-from app.routers.conversion.audio import router as audio_conversion_router
-from app.routers.conversion.online import router as online_conversion_router
-from app.routers.files.operations import router as files_router
-from app.routers.audio.operations import router as audio_router
-from app.routers.auth import router as auth_router
-from app.routers.scores import router as scores_router
+from routers.home import router as home_router
+from routers.conversion.audio import router as audio_conversion_router
+from routers.conversion.online import router as online_conversion_router
+from routers.files.operations import router as files_router
+from routers.audio.operations import router as audio_router
+from routers.auth import router as auth_router
+from routers.scores import router as scores_router
 
 # Import utils
-from app.utils import setup_musescore_path
-from app.utils.cleanup import cleanup_old_files
+from utils import setup_musescore_path
+from utils.cleanup import cleanup_old_files
 
 # Set up logger
 logger = logging.getLogger(__name__)

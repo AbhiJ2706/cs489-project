@@ -5,10 +5,10 @@ from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import Field, Relationship
 from pydantic import EmailStr
 
-from app.models.base import BaseModel
+from models.base import BaseModel
 
 if TYPE_CHECKING:
-    from app.models.score import ScoreGeneration
+    from models.score import ScoreGeneration
 
 class User(BaseModel, table=True):
     """User model for authentication."""

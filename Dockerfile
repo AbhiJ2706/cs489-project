@@ -123,4 +123,4 @@ ENV CORS_ALLOW_ORIGINS="https://www.visualize.music,http://localhost:3000,*"
 ARG DATABASE_URL
 
 # Run setup script and then start the API server
-CMD bun setup.js && uvicorn app.main:app --host 0.0.0.0 --port 8000
+CMD bun setup.js && cd app && uvicorn main:app --host 0.0.0.0 --port 8000
