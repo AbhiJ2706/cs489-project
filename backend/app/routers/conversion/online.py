@@ -173,7 +173,8 @@ async def convert_youtube(
             str(wav_path),
             str(musicxml_path),
             title=title,
-            output_pdf=str(pdf_path)
+            output_pdf=str(pdf_path),
+            messy=True
         )
         
         # Check if conversion was successful for MusicXML
@@ -409,7 +410,8 @@ async def convert_spotify(
             str(wav_path),
             str(musicxml_path),
             title=title,
-            output_pdf=str(pdf_path)
+            output_pdf=str(pdf_path),
+            messy=True
         )
         
         # Check if conversion was successful for MusicXML
