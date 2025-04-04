@@ -1,4 +1,4 @@
-import librosa  # Keep for frequency calculations if needed
+import librosa 
 from scipy.signal import find_peaks
 import librosa
 import librosa.display
@@ -8,7 +8,7 @@ import pretty_midi
 from pedalboard import Compressor, Gain, LowShelfFilter, NoiseGate, Pedalboard
 from scipy.signal import butter, filtfilt, find_peaks
 
-from app.utils import setup_musescore_path
+from utils import setup_musescore_path
 
 # Initialize MuseScore path
 setup_musescore_path()
@@ -125,7 +125,7 @@ def __determine_start_end_frames(start_time, end_time, audio_data, sample_rate, 
 
 
 def __track_note_peaks(segment):
-    data = [find_peaks(x, height=0.7) for x in segment.T]
+    data = [find_peaks(x, height=PEAK_ENERGY_THRESHOLD * np.max(x)) for x in segment.T]
     peaks = [d[0] for d in data]
     energy = [d[1]['peak_heights'] for d in data]
     peak_tracker = dict()
@@ -178,6 +178,52 @@ def determine_potential_notes(audio_data, sample_rate):
     onset_times = np.append(onset_times, total_duration)
 
     return C, onset_times
+
+
+def __quantize_notes(midi_data, ticks_per_beat=480):
+    quantized_midi = pretty_midi.PrettyMIDI(resolution=ticks_per_beat)
+
+    for instrument in midi_data.instruments:
+        quantized_instrument = pretty_midi.Instrument(
+            program=instrument.program,
+            is_drum=instrument.is_drum,
+            name=instrument.name
+        )
+
+        notes_by_start = {}
+        for note in instrument.notes:
+            start_beat = midi_data.time_to_tick(note.start) / ticks_per_beat
+            quantized_start_beat = round(start_beat * 16) / 16
+
+            if quantized_start_beat not in notes_by_start:
+                notes_by_start[quantized_start_beat] = []
+            notes_by_start[quantized_start_beat].append(note)
+
+        for start_beat, notes in notes_by_start.items():
+            for note in notes:
+                end_beat = midi_data.time_to_tick(note.end) / ticks_per_beat
+                quantized_end_beat = round(end_beat * 16) / 16
+
+                if quantized_end_beat <= start_beat:
+                    quantized_end_beat = start_beat + 0.25
+
+                quantized_start = midi_data.tick_to_time(
+                    int(start_beat * ticks_per_beat))
+                quantized_end = midi_data.tick_to_time(
+                    int(quantized_end_beat * ticks_per_beat))
+
+                quantized_note = pretty_midi.Note(
+                    velocity=note.velocity,
+                    pitch=note.pitch,
+                    start=quantized_start,
+                    end=quantized_end
+                )
+
+                quantized_instrument.notes.append(quantized_note)
+
+        quantized_midi.instruments.append(quantized_instrument)
+
+    return quantized_midi
 
 
 def __determine_valid(start_frame, end_frame, energy_map, min_note_duration_frames, noise_floor_threshold, add_reasons=False):
@@ -237,50 +283,6 @@ def detect_notes_and_chords(audio_data, sample_rate, tempo):
     midi_data.instruments.append(piano)
     midi_data = __quantize_notes(midi_data)
 
+    midi_data.write('test.mid')
+
     return midi_data
-
-
-def __quantize_notes(midi_data, ticks_per_beat=480, beats_per_measure=4):
-    quantized_midi = pretty_midi.PrettyMIDI(resolution=ticks_per_beat)
-
-    for instrument in midi_data.instruments:
-        quantized_instrument = pretty_midi.Instrument(
-            program=instrument.program,
-            is_drum=instrument.is_drum,
-            name=instrument.name
-        )
-
-        notes_by_start = {}
-        for note in instrument.notes:
-            start_beat = midi_data.time_to_tick(note.start) / ticks_per_beat
-            quantized_start_beat = round(start_beat * 16) / 16
-
-            if quantized_start_beat not in notes_by_start:
-                notes_by_start[quantized_start_beat] = []
-            notes_by_start[quantized_start_beat].append(note)
-
-        for start_beat, notes in notes_by_start.items():
-            for note in notes:
-                end_beat = midi_data.time_to_tick(note.end) / ticks_per_beat
-                quantized_end_beat = round(end_beat * 16) / 16
-
-                if quantized_end_beat <= start_beat:
-                    quantized_end_beat = start_beat + 0.25
-
-                quantized_start = midi_data.tick_to_time(
-                    int(start_beat * ticks_per_beat))
-                quantized_end = midi_data.tick_to_time(
-                    int(quantized_end_beat * ticks_per_beat))
-
-                quantized_note = pretty_midi.Note(
-                    velocity=note.velocity,
-                    pitch=note.pitch,
-                    start=quantized_start,
-                    end=quantized_end
-                )
-
-                quantized_instrument.notes.append(quantized_note)
-
-        quantized_midi.instruments.append(quantized_instrument)
-
-    return quantized_midi

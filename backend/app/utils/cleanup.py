@@ -8,7 +8,7 @@ import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from app.config import TEMP_DIR
+from config import TEMP_DIR
 
 # Set up logger
 logger = logging.getLogger(__name__)

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import find_peaks
 
-from app.process_audio import HOP_LENGTH, NOTE_NOISE_FLOOR_MULTIPLIER, __determine_start_end_frames, __determine_valid, __track_note_peaks, determine_potential_notes
+from process_audio import HOP_LENGTH, NOTE_NOISE_FLOOR_MULTIPLIER, __determine_start_end_frames, __determine_valid, __track_note_peaks, determine_potential_notes
 
 
 def plot_segment(segment, validity, idx, output_image):
@@ -16,8 +16,8 @@ def plot_segment(segment, validity, idx, output_image):
         note_list = [librosa.midi_to_note(n + 21) for n in xticks]
 
     validity_string = ', Reason(s): ' + ', '.join(
-            validity[1]) if not validity[0] else f'Note(s) found: {note_list}'
-    title = f"Segment 1 temporal plot ({'Valid note' if validity[0] else 'Invalid note'}{validity_string})"
+            validity[1]) if not validity[0] else f'(s) found: {note_list}'
+    title = f"Segment {idx + 1} temporal plot ({'Valid note' if validity[0] else 'Invalid note'}{validity_string})"
 
     if segment.shape[1] == 1:
         plt.plot(np.arange(segment.shape[0]), segment[:, 0])
@@ -107,7 +107,7 @@ def visualize_audio(audio_data, sample_rate, output_image=None, tempo=120):
     for i, (segment, validity) in enumerate(zip(segments, notes)):
         plot_segment(segment, validity, i, output_image)
 
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(12, 5))
 
     librosa.display.waveshow(audio_data, sr=sample_rate)
     plt.title('Waveform')

@@ -6,9 +6,9 @@ import logging
 import librosa
 import librosa.display
 from music21 import (clef, duration, instrument, metadata,
-                     meter, note, stream, tempo, tie, converter)
+                     meter, note, stream, tempo, tie, converter, chord)
 
-from app.utils import setup_musescore_path
+from utils import setup_musescore_path
 from music21 import environment
 import numpy as np
 
@@ -229,6 +229,9 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120, composer="Das
             if start_time not in notes_by_time:
                 notes_by_time[start_time] = []
             notes_by_time[start_time].append(midi_note)
+        
+        from pprint import pprint
+        pprint(notes_by_time)
 
         time_points = sorted(notes_by_time.keys())
 
@@ -237,46 +240,95 @@ def midi_to_musicxml(midi_data, title="Transcribed Music", tp=120, composer="Das
         for time_point in time_points:
             notes_at_time = notes_by_time[time_point]
 
-            if notes_at_time:
-                for note_obj in notes_at_time:
-                    note_duration = __convert_to_time(
-                        (note_obj.end - note_obj.start) / (1 / (tp / 4) * 15))
+            if len(notes_at_time) == 1:
+                note_obj = notes_at_time[0]
+                note_duration = __convert_to_time(
+                    (note_obj.end - note_obj.start) / (1 / (tp / 4) * 15))
+                n = note.Note(note_obj.pitch)
+
+                if current_end_time == -1:
+                    current_end_time = note_obj.end
+                else:
+                    start_rest_time = note_obj.start - current_end_time
+                    if start_rest_time / (1 / (tp / 4) * 15) >= REST_GAP_THRESHOLD:
+                        while start_rest_time > 0:
+                            gap = __convert_to_time(start_rest_time / (1 / (tp / 4) * 15))
+                            treble_part.append(note.Rest(TIME_TO_REST[gap]))
+                            bass_part.append(note.Rest(TIME_TO_REST[gap]))
+                            start_rest_time -= (gap * (1 / (tp / 4) * 15))
+                    current_end_time = note_obj.end
+
+                if note_duration <= 0.25:
+                    n.duration = duration.Duration(type='16th')
+                    r = note.Rest('16th')
+                elif note_duration <= 0.5:
+                    n.duration = duration.Duration(type='eighth')
+                    r = note.Rest('eighth')
+                elif note_duration <= 1.0:
+                    n.duration = duration.Duration(type='quarter')
+                    r = note.Rest('quarter')
+                elif note_duration <= 2.0:
+                    n.duration = duration.Duration(type='half')
+                    r = note.Rest('half')
+                else:
+                    n.duration = duration.Duration(type='whole')
+                    r = note.Rest('whole')
+
+                if n.pitch.midi >= 60:
+                    treble_part.append(n)
+                    bass_part.append(r)
+                else:
+                    treble_part.append(r)
+                    bass_part.append(n)
+            else:
+                notes = []
+                note_duration = __convert_to_time(
+                    (notes_at_time[0].end - notes_at_time[0].start) / (1 / (tp / 4) * 15))
+                for i, note_obj in enumerate(notes_at_time):
                     n = note.Note(note_obj.pitch)
+                    notes.append(n)
 
-                    if current_end_time == -1:
-                        current_end_time = note_obj.end
-                    else:
-                        start_rest_time = note_obj.start - current_end_time
-                        if start_rest_time / (1 / (tp / 4) * 15) >= REST_GAP_THRESHOLD:
-                            while start_rest_time > 0:
-                                gap = __convert_to_time(start_rest_time / (1 / (tp / 4) * 15))
-                                treble_part.append(note.Rest(TIME_TO_REST[gap]))
-                                bass_part.append(note.Rest(TIME_TO_REST[gap]))
-                                start_rest_time -= (gap * (1 / (tp / 4) * 15))
-                        current_end_time = note_obj.end
+                    if i == len(notes_at_time) - 1:
+                        if current_end_time == -1:
+                            current_end_time = note_obj.end
+                        else:
+                            start_rest_time = note_obj.start - current_end_time
+                            if start_rest_time / (1 / (tp / 4) * 15) >= REST_GAP_THRESHOLD:
+                                while start_rest_time > 0:
+                                    gap = __convert_to_time(start_rest_time / (1 / (tp / 4) * 15))
+                                    treble_part.append(note.Rest(TIME_TO_REST[gap]))
+                                    bass_part.append(note.Rest(TIME_TO_REST[gap]))
+                                    start_rest_time -= (gap * (1 / (tp / 4) * 15))
+                            current_end_time = note_obj.end
 
-                    if note_duration <= 0.25:
+                if note_duration <= 0.25:
+                    for n in notes:
                         n.duration = duration.Duration(type='16th')
-                        r = note.Rest('16th')
-                    elif note_duration <= 0.5:
+                    r = note.Rest('16th')
+                elif note_duration <= 0.5:
+                    for n in notes:
                         n.duration = duration.Duration(type='eighth')
-                        r = note.Rest('eighth')
-                    elif note_duration <= 1.0:
+                    r = note.Rest('eighth')
+                elif note_duration <= 1.0:
+                    for n in notes:
                         n.duration = duration.Duration(type='quarter')
-                        r = note.Rest('quarter')
-                    elif note_duration <= 2.0:
+                    r = note.Rest('quarter')
+                elif note_duration <= 2.0:
+                    for n in notes:
                         n.duration = duration.Duration(type='half')
-                        r = note.Rest('half')
-                    else:
+                    r = note.Rest('half')
+                else:
+                    for n in notes:
                         n.duration = duration.Duration(type='whole')
-                        r = note.Rest('whole')
+                    r = note.Rest('whole')
 
-                    if n.pitch.midi >= 60:
-                        treble_part.append(n)
-                        bass_part.append(r)
-                    else:
-                        treble_part.append(r)
-                        bass_part.append(n)
+                c = chord.Chord(notes)
+                if notes[0].pitch.midi >= 60:
+                    treble_part.append(c)
+                    bass_part.append(r)
+                else:
+                    treble_part.append(r)
+                    bass_part.append(c)
 
     else:
         placeholder = note.Rest()
