@@ -13,12 +13,13 @@ const graph = i.graph(
       "email": i.any().unique().indexed(),
     }),
     "audio": i.entity({
-  
+      "storagePath": i.any(),
     }),
     "conversions": i.entity({
   
     }),
     "sheet": i.entity({
+      "storagePath": i.any(),
       "title": i.any(),
     }),
   },
@@ -47,18 +48,6 @@ const graph = i.graph(
         "label": "audio"
       }
     },
-    "audioConversions": {
-      "forward": {
-        "on": "audio",
-        "has": "many",
-        "label": "conversions"
-      },
-      "reverse": {
-        "on": "conversions",
-        "has": "many",
-        "label": "audio"
-      }
-    },
     "conversions$files": {
       "forward": {
         "on": "conversions",
@@ -68,6 +57,30 @@ const graph = i.graph(
       "reverse": {
         "on": "$files",
         "has": "one",
+        "label": "conversions"
+      }
+    },
+    "conversionsAudio": {
+      "forward": {
+        "on": "conversions",
+        "has": "many",
+        "label": "audio"
+      },
+      "reverse": {
+        "on": "audio",
+        "has": "many",
+        "label": "conversions"
+      }
+    },
+    "conversionsSheet": {
+      "forward": {
+        "on": "conversions",
+        "has": "many",
+        "label": "sheet"
+      },
+      "reverse": {
+        "on": "sheet",
+        "has": "many",
         "label": "conversions"
       }
     },
