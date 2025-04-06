@@ -23,7 +23,7 @@ def setup_musescore_path():
     macos_path = '/Applications/MuseScore 4.app/Contents/MacOS/mscore'
     
     # Debug all paths
-    for path in ['/usr/local/bin/mscore', 'mscore', '/app/squashfs-root/bin/mscore4portable']:
+    for path in ['/usr/local/bin/mscore', 'mscore', '/opt/musescore/bin/mscore4portable', '/app/squashfs-root/bin/mscore4portable']:
         if os.path.exists(path):
             file_stats = os.stat(path)
             is_executable = bool(file_stats.st_mode & 0o111)

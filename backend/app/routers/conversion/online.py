@@ -29,6 +29,9 @@ from utils.cleanup import cleanup_temp_directory, cleanup_file_by_id
 from utils.logger import get_logger
 logger = get_logger(__name__)
 
+# Default maximum duration for media conversions in seconds
+DEFAULT_MAX_DURATION = 60
+
 router = APIRouter(tags=["conversion"])
 
 @router.post("/convert-youtube", response_model=ConversionResult)
@@ -48,7 +51,7 @@ async def convert_youtube(
     """
     url = youtube_data.url
     title = youtube_data.title
-    max_duration = youtube_data.max_duration or 20  # Use provided duration or default to 20 seconds
+    max_duration = youtube_data.max_duration or DEFAULT_MAX_DURATION  # Use provided duration or default to 60 seconds
     
     # Create unique file ID and paths
     file_id = f"{os.urandom(4).hex()}"
@@ -296,7 +299,7 @@ async def convert_spotify(
     """
     url = spotify_data.url
     title = spotify_data.title
-    max_duration = spotify_data.max_duration or 20  # Use provided duration or default to 20 seconds
+    max_duration = spotify_data.max_duration or DEFAULT_MAX_DURATION  # Use provided duration or default to 60 seconds
     
     # Create unique file ID and paths
     file_id = f"{os.urandom(4).hex()}"
